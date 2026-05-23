@@ -1,543 +1,449 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 
-const COLOR_PALETTE = [
-  "#3a6e4a","#7c5a2a","#3a5a7c","#7c3a6e",
-  "#6e6e3a","#3a6e6e","#7c4a3a","#4a3a7c",
-  "#5a3a7c","#7c6a3a","#3a7c5a","#7c3a3a",
-];
-const EMOJI_LIST = ["🌿","🍇","🌊","🌸","🌾","🍃","🍂","🫐","🌻","🍋","🌴","⛰️","🏔️","🌵","🦋"];
-
-function hexToRgba(hex,a){
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-const initialData = [
-  { id:"kanayama",name:"金山寺",color:"#3a6e4a",emoji:"🌿",
-    sections:[
-      {id:"glass",name:"ガラス温室",todos:[
-        {id:1,text:"誘引",done:false,priority:"high"},
-        {id:2,text:"棚線張り直し",done:false,priority:"mid"},
-      ]},
-      {id:"field2",name:"圃場２",todos:[
-        {id:3,text:"棚修理",done:false,priority:"high"},
-        {id:4,text:"草刈り",done:false,priority:"low"},
-      ]},
-    ],todos:[]},
-  { id:"ayugaeri",name:"鮎帰",color:"#7c5a2a",emoji:"🍇",sections:[],todos:[
-    {id:5,text:"棚線張る",done:false,priority:"high"},
-    {id:6,text:"シャインマスカット誘引",done:false,priority:"mid"},
-  ]},
-  {id:"yokoiue",name:"横井上",color:"#3a5a7c",emoji:"🌊",sections:[],todos:[]},
-  {id:"yoshio",name:"吉尾",color:"#7c3a6e",emoji:"🌸",sections:[],todos:[]},
-];
-
-const P = {
-  high:{label:"急",color:"#e05555"},
-  mid: {label:"中",color:"#e09040"},
-  low: {label:"低",color:"#5aaa5a"},
+const PRIORITY_CONFIG = {
+  急: { label: "急", color: "#ef4444", ring: "#ef4444" },
+  中: { label: "中", color: "#f97316", ring: "#f97316" },
+  低: { label: "低", color: "#22c55e", ring: "#22c55e" },
 };
 
-/* ── インライン編集テキスト ── */
-function EditableText({value, onSave, style, placeholder}){
-  const [editing,setEditing]=useState(false);
-  const [val,setVal]=useState(value);
-  const ref=useRef();
-  useEffect(()=>{if(editing&&ref.current)ref.current.focus();},[editing]);
-  useEffect(()=>{setVal(value);},[value]);
-  if(editing) return(
-    <input ref={ref} value={val}
-      onChange={e=>setVal(e.target.value)}
-      onBlur={()=>{onSave(val.trim()||value);setEditing(false);}}
-      onKeyDown={e=>{if(e.key==="Enter"){onSave(val.trim()||value);setEditing(false);}if(e.key==="Escape"){setVal(value);setEditing(false);}}}
-      style={{...style,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.4)",
-        borderRadius:4,outline:"none",padding:"1px 4px",color:"#fff",minWidth:0,width:"100%",boxSizing:"border-box"}}
-    />
-  );
-  return <span onClick={()=>setEditing(true)} style={{...style,cursor:"text",minWidth:0}} title="タップで編集">{value||placeholder}</span>;
-}
+const EMOJI_LIST = [
+  "🌾","🍇","🫛","🌽","🍅","🥬","🥕","🍓","🍈","🍑","🍒","🥦","🌿","🌱","🪴","🌳","🌲","🌵","🎋","🎍",
+  "🦆","🐓","🐄","🐖","🐑","🐇","🦌","🐗","🐝","🦋","🐛","🐌","🐞","🦗","🦟","🐜","🐢","🐍","🦎","🐠",
+  "🏔️","⛰️","🌋","🗻","🏕️","🌊","🏞️","🌄","🌅","🌠","⭐","🌟","✨","☀️","🌙","🌈","⛅","🌧️","❄️","🌬️",
+  "🚜","⛏️","🪚","🔨","🪣","💧","🌡️","🧪","🧬","🔬","📋","📊","📈","🗓️","⏰","🔔","📍","🗂️","📦","🏠",
+  "🍷","🍶","🧃","☕","🍵","🥂","🍺","🍻","🎵","🎷","🎸","🎹","🎺","🎻","🥁","🎤","🎧","🎼","🎭","🎨",
+  "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","✅","🔥",
+  "🌸","🌺","🌻","🌹","🌷","💐","🪷","🌼","🌞","🎃","🎄","🎆","🎇","🎑","🎋","🎍","🎎","🎏","🎐","🎗️",
+  "🐉","🦁","🐯","🦊","🐺","🐻","🐼","🦝","🐨","🦘","🦙","🦒","🐘","🦏","🦛","🦬","🐃","🐂","🐎","🦄",
+];
 
-/* ── モーダル共通 ── */
-function Modal({onClose,children}){
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#1c2a20",borderRadius:"18px 18px 0 0",padding:"20px 18px 44px",width:"100%",maxWidth:480,border:"1px solid rgba(255,255,255,0.12)"}}>
-        {children}
-      </div>
+const initialAreas = [
+  {
+    id: 1, name: "金山", emoji: "🌾", color: "#5b3d8f",
+    groups: [
+      { id: "g1", name: null, tasks: [
+        { id: "t1", text: "あ", priority: "中", done: false },
+        { id: "t2", text: "あ", priority: "中", done: false },
+      ]},
+      { id: "g2", name: "ガラス温室", tasks: [
+        { id: "t3", text: "誘引", priority: "急", done: false },
+        { id: "t4", text: "棚線張り直し", priority: "中", done: false },
+      ]},
+      { id: "g3", name: "圃場２", tasks: [
+        { id: "t5", text: "棚修理", priority: "急", done: false },
+        { id: "t6", text: "草刈り", priority: "低", done: false },
+      ]},
+    ]
+  },
+  {
+    id: 2, name: "鮎帰", emoji: "🍇", color: "#7c5c1e",
+    groups: [
+      { id: "g4", name: null, tasks: [
+        { id: "t7", text: "棚線張る", priority: "急", done: false },
+        { id: "t8", text: "シャインマスカット誘引", priority: "中", done: false },
+      ]},
+    ]
+  },
+  {
+    id: 3, name: "横井上", emoji: "🌊", color: "#1e4a6e",
+    groups: [
+      { id: "g5", name: null, tasks: [
+        { id: "t9", text: "あ", priority: "中", done: false },
+        { id: "t10", text: "あ", priority: "中", done: false },
+        { id: "t11", text: "あ", priority: "中", done: false },
+        { id: "t12", text: "あ", priority: "中", done: false },
+        { id: "t13", text: "あ", priority: "中", done: false },
+        { id: "t14", text: "あ", priority: "中", done: false },
+        { id: "t15", text: "あ", priority: "中", done: false },
+      ]},
+    ]
+  },
+  {
+    id: 4, name: "吉尾", emoji: "🌸", color: "#7c1e5c",
+    groups: [
+      { id: "g6", name: null, tasks: [] },
+    ]
+  },
+];
+
+let nextId = 100;
+const uid = () => `id-${nextId++}`;
+
+function EmojiPicker({ current, onSelect, onClose }) {
+  const ref = useRef();
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} style={{
+      position: "absolute", top: "110%", left: 0, zIndex: 1000,
+      background: "#1a1a2e", border: "1px solid #444", borderRadius: 12,
+      padding: 10, width: 240, maxHeight: 200, overflowY: "auto",
+      display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 3,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.8)"
+    }}>
+      {EMOJI_LIST.map(e => (
+        <button key={e} onClick={() => { onSelect(e); onClose(); }} style={{
+          background: e === current ? "#444" : "transparent",
+          border: "none", borderRadius: 5, fontSize: 16, cursor: "pointer",
+          padding: "2px", lineHeight: 1.4,
+        }}>{e}</button>
+      ))}
     </div>
   );
 }
 
-/* ── タスク追加モーダル ── */
-function AddTodoModal({target,fields,onAdd,onClose}){
-  const [text,setText]=useState("");
-  const [pri,setPri]=useState("mid");
-  const field=fields.find(f=>f.id===target.fieldId);
-  const section=target.sectionId?field?.sections.find(s=>s.id===target.sectionId):null;
-  return(
-    <Modal onClose={onClose}>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:4}}>{field?.emoji} {field?.name}{section?` › ${section.name}`:""}</div>
-      <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>タスクを追加</div>
-      <input autoFocus value={text} onChange={e=>setText(e.target.value)} placeholder="例：誘引、棚修理..."
-        onKeyDown={e=>{if(e.key==="Enter"&&text.trim())onAdd(text.trim(),pri);if(e.key==="Escape")onClose();}}
-        style={iStyle}/>
-      <div style={{display:"flex",gap:10,margin:"14px 0 18px"}}>
-        {["high","mid","low"].map(p=>(
-          <button key={p} onClick={()=>setPri(p)} style={{flex:1,padding:"10px 0",borderRadius:10,fontWeight:700,fontSize:15,cursor:"pointer",
-            color:pri===p?"#fff":P[p].color,background:pri===p?P[p].color:"rgba(255,255,255,0.06)",border:`2px solid ${P[p].color}`}}>{P[p].label}</button>
-        ))}
-      </div>
-      <button onClick={()=>{if(text.trim())onAdd(text.trim(),pri);}} style={sBtn(field?.color)}>追加する</button>
-    </Modal>
-  );
-}
+function TaskItem({ task, onToggle, onDelete, onPriorityChange, onTextChange }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(task.text);
+  const cfg = PRIORITY_CONFIG[task.priority];
+  const priorities = ["急", "中", "低"];
 
-/* ── エリア追加モーダル ── */
-function AddSectionModal({fieldId,fields,onAdd,onClose}){
-  const [name,setName]=useState("");
-  const field=fields.find(f=>f.id===fieldId);
-  return(
-    <Modal onClose={onClose}>
-      <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>{field?.emoji} {field?.name} › エリア追加</div>
-      <input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="例：ガラス温室、圃場２..."
-        onKeyDown={e=>{if(e.key==="Enter"&&name.trim())onAdd(name.trim());if(e.key==="Escape")onClose();}}
-        style={iStyle}/>
-      <button onClick={()=>{if(name.trim())onAdd(name.trim());}} style={{...sBtn(field?.color),marginTop:18}}>追加する</button>
-    </Modal>
-  );
-}
-
-/* ── 地区追加モーダル ── */
-function AddFieldModal({fields,onAdd,onClose}){
-  const [name,setName]=useState("");
-  const [emoji,setEmoji]=useState("🌿");
-  const [color,setColor]=useState("#3a6e4a");
-  return(
-    <Modal onClose={onClose}>
-      <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>🗾 新しい地区を追加</div>
-      <input autoFocus value={name} onChange={e=>setName(e.target.value)} placeholder="例：横井上、吉尾..."
-        onKeyDown={e=>{if(e.key==="Enter"&&name.trim())onAdd(name.trim(),emoji,color);if(e.key==="Escape")onClose();}}
-        style={iStyle}/>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",margin:"14px 0 8px"}}>アイコン</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-        {EMOJI_LIST.map(e=>(<button key={e} onClick={()=>setEmoji(e)} style={{width:40,height:40,borderRadius:10,fontSize:19,cursor:"pointer",
-          background:emoji===e?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.07)",
-          border:emoji===e?"2px solid rgba(255,255,255,0.6)":"1.5px solid rgba(255,255,255,0.1)"}}>{e}</button>))}
-      </div>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:8}}>カラー</div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-        {COLOR_PALETTE.map(c=>(<button key={c} onClick={()=>setColor(c)} style={{width:32,height:32,borderRadius:"50%",background:c,cursor:"pointer",padding:0,
-          border:color===c?"3px solid #fff":"2px solid transparent",boxShadow:color===c?`0 0 0 2px ${c}`:"none"}}/>))}
-        <label style={{position:"relative",width:32,height:32,cursor:"pointer"}}>
-          <div style={{width:32,height:32,borderRadius:"50%",background:"conic-gradient(red,yellow,lime,cyan,blue,magenta,red)",border:"2px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🎨</div>
-          <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%",height:"100%"}}/>
-        </label>
-      </div>
-      <div style={{background:`linear-gradient(135deg,${color}dd,${color}99)`,borderRadius:10,padding:"9px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:18}}>{emoji}</span>
-        <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{name||"地区名"}</span>
-      </div>
-      <button onClick={()=>{if(name.trim())onAdd(name.trim(),emoji,color);}} style={{...sBtn(color),opacity:name.trim()?1:0.5}}>地区を追加する</button>
-    </Modal>
-  );
-}
-
-/* ── 長押し地区編集メニュー ── */
-function FieldEditModal({field,onSave,onDelete,onClose}){
-  const [name,setName]=useState(field.name);
-  const [emoji,setEmoji]=useState(field.emoji);
-  const [color,setColor]=useState(field.color);
-  return(
-    <Modal onClose={onClose}>
-      <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>✏️ 地区を編集</div>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:6}}>地区名</div>
-      <input value={name} onChange={e=>setName(e.target.value)}
-        style={iStyle}/>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",margin:"14px 0 8px"}}>アイコン</div>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-        {EMOJI_LIST.map(e=>(<button key={e} onClick={()=>setEmoji(e)} style={{width:40,height:40,borderRadius:10,fontSize:19,cursor:"pointer",
-          background:emoji===e?"rgba(255,255,255,0.25)":"rgba(255,255,255,0.07)",
-          border:emoji===e?"2px solid rgba(255,255,255,0.6)":"1.5px solid rgba(255,255,255,0.1)"}}>{e}</button>))}
-      </div>
-      <div style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:8}}>カラー</div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:18}}>
-        {COLOR_PALETTE.map(c=>(<button key={c} onClick={()=>setColor(c)} style={{width:32,height:32,borderRadius:"50%",background:c,cursor:"pointer",padding:0,
-          border:color===c?"3px solid #fff":"2px solid transparent",boxShadow:color===c?`0 0 0 2px ${c}`:"none"}}/>))}
-        <label style={{position:"relative",width:32,height:32,cursor:"pointer"}}>
-          <div style={{width:32,height:32,borderRadius:"50%",background:"conic-gradient(red,yellow,lime,cyan,blue,magenta,red)",border:"2px solid rgba(255,255,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🎨</div>
-          <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{position:"absolute",inset:0,opacity:0,cursor:"pointer",width:"100%",height:"100%"}}/>
-        </label>
-      </div>
-      {/* プレビュー */}
-      <div style={{background:`linear-gradient(135deg,${color}dd,${color}99)`,borderRadius:10,padding:"9px 14px",marginBottom:18,display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:18}}>{emoji}</span>
-        <span style={{fontSize:14,fontWeight:700,color:"#fff"}}>{name||"地区名"}</span>
-      </div>
-      <button onClick={()=>onSave(name.trim()||field.name,emoji,color)} style={{...sBtn(color),marginBottom:10}}>保存する</button>
-      <button onClick={onDelete} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:"rgba(220,60,60,0.7)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>🗑️ この地区を削除する</button>
-    </Modal>
-  );
-}
-
-/* ── 完了一括クリア確認 ── */
-function ClearDoneModal({count,onClear,onClose}){
-  return(
-    <Modal onClose={onClose}>
-      <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>✅ 完了タスクを一括クリア</div>
-      <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",marginBottom:24}}>完了済み <span style={{color:"#e05555",fontWeight:700}}>{count}件</span> を全て削除しますか？</div>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onClose} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid rgba(255,255,255,0.2)",background:"transparent",color:"rgba(255,255,255,0.7)",fontSize:14,cursor:"pointer"}}>キャンセル</button>
-        <button onClick={onClear} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#e05555",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>削除する</button>
-      </div>
-    </Modal>
-  );
-}
-
-/* ── ToDo1行 ── */
-function TodoRow({todo,onToggle,onDelete,onEditText,onDragStart,onDragOver,onDrop}){
-  const p=P[todo.priority]||P.low;
-  return(
-    <div draggable onDragStart={onDragStart}
-      onDragOver={e=>{e.preventDefault();onDragOver&&onDragOver();}}
-      onDrop={onDrop}
-      style={{display:"flex",alignItems:"center",gap:8,padding:"7px 8px",borderRadius:7,
-        background:todo.done?"transparent":"rgba(255,255,255,0.07)",
-        marginBottom:3,opacity:todo.done?0.38:1,transition:"opacity 0.15s",
-        border:"1px solid transparent",cursor:"grab"}}>
-      <button onClick={onToggle} style={{width:22,height:22,borderRadius:"50%",flexShrink:0,
-        border:`2px solid ${todo.done?"rgba(255,255,255,0.3)":p.color}`,
-        background:todo.done?"rgba(255,255,255,0.3)":"transparent",
-        cursor:"pointer",padding:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {todo.done&&<span style={{fontSize:11,color:"#fff",fontWeight:700,lineHeight:1}}>✓</span>}
-      </button>
-      <EditableText value={todo.text} onSave={onEditText}
-        style={{flex:1,fontSize:12,color:"rgba(255,255,255,0.88)",
-          textDecoration:todo.done?"line-through":"none",lineHeight:1.35,wordBreak:"break-all"}}/>
-      <span style={{fontSize:10,fontWeight:700,color:p.color,flexShrink:0}}>{p.label}</span>
-      <button onClick={onDelete} style={{background:"rgba(255,255,255,0.08)",border:"none",color:"rgba(255,255,255,0.5)",
-        fontSize:14,cursor:"pointer",padding:0,width:22,height:22,borderRadius:5,
-        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>×</button>
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 7,
+      padding: "6px 8px", background: "rgba(255,255,255,0.04)",
+      borderRadius: 7, marginBottom: 3
+    }}>
+      <button onClick={onToggle} style={{
+        width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+        border: `2px solid ${cfg.ring}`,
+        background: task.done ? cfg.ring : "transparent",
+        cursor: "pointer", padding: 0
+      }} />
+      {editing ? (
+        <input autoFocus value={val}
+          onChange={e => setVal(e.target.value)}
+          onBlur={() => { onTextChange(val); setEditing(false); }}
+          onKeyDown={e => e.key === "Enter" && e.target.blur()}
+          style={{
+            flex: 1, background: "transparent", border: "none",
+            borderBottom: "1px solid #aaa", color: "#fff",
+            fontSize: 12, outline: "none", padding: "1px 0"
+          }}
+        />
+      ) : (
+        <span onClick={() => setEditing(true)} style={{
+          flex: 1, fontSize: 12, color: task.done ? "#555" : "#ddd",
+          textDecoration: task.done ? "line-through" : "none",
+          cursor: "text", lineHeight: 1.4, wordBreak: "break-all"
+        }}>{task.text}</span>
+      )}
+      <button onClick={() => {
+        const idx = priorities.indexOf(task.priority);
+        onPriorityChange(priorities[(idx + 1) % priorities.length]);
+      }} style={{
+        fontSize: 10, fontWeight: "bold", color: cfg.color,
+        background: "transparent", border: "none", cursor: "pointer",
+        padding: "1px 3px", flexShrink: 0
+      }}>{cfg.label}</button>
+      <button onClick={onDelete} style={{
+        color: "#555", background: "transparent", border: "none",
+        cursor: "pointer", fontSize: 13, lineHeight: 1, flexShrink: 0
+      }}>×</button>
     </div>
   );
 }
 
-const iStyle={width:"100%",boxSizing:"border-box",border:"1.5px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"12px 14px",fontSize:15,background:"rgba(255,255,255,0.08)",color:"#fff",fontFamily:"'Noto Sans JP',sans-serif",outline:"none"};
-const sBtn=color=>({width:"100%",padding:"14px",borderRadius:12,border:"none",background:color||"#4a7c59",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"});
-const iconBtn={background:"rgba(255,255,255,0.2)",border:"none",color:"rgba(255,255,255,0.9)",fontSize:14,borderRadius:7,width:26,height:26,cursor:"pointer",padding:0,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"};
-
-/* ── メイン ── */
-function FarmTodo(){
-  const [fields,setFields]=useState(()=>{
-    try{const s=localStorage.getItem("farmtodo_v7");return s?JSON.parse(s):initialData;}catch{return initialData;}
-  });
-  const [appTitle,setAppTitle]=useState(()=>localStorage.getItem("farmtodo_title")||"圃場 ToDo");
-  const [addingTodo,setAddingTodo]=useState(null);
-  const [addingSection,setAddingSection]=useState(null);
-  const [addingField,setAddingField]=useState(false);
-  const [showDone,setShowDone]=useState(false);
-  const [showClearDone,setShowClearDone]=useState(false);
-  const [editingField,setEditingField]=useState(null);
-  const [logs,setLogs]=useState(()=>{try{const s=localStorage.getItem("farmtodo_logs");return s?JSON.parse(s):[];}catch{return [];}});
-  const dragInfo=useRef(null);
-  const longPressTimer=useRef(null);
-
-  useEffect(()=>{try{localStorage.setItem("farmtodo_v7",JSON.stringify(fields));}catch{}},[fields]);
-  useEffect(()=>{try{localStorage.setItem("farmtodo_logs",JSON.stringify(logs.slice(0,300)));}catch{}},[logs]);
-  useEffect(()=>{try{localStorage.setItem("farmtodo_title",appTitle);}catch{}},[appTitle]);
-
-  const addLog=text=>{
-    const n=new Date();
-    const t=`${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,"0")}/${String(n.getDate()).padStart(2,"0")} ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
-    setLogs(prev=>[{time:t,text},...prev]);
+function GroupSection({ group, onTasksChange }) {
+  const addTask = () => {
+    onTasksChange([...group.tasks, { id: uid(), text: "新タスク", priority: "中", done: false }]);
+  };
+  const updateTask = (id, patch) => {
+    onTasksChange(group.tasks.map(t => t.id === id ? { ...t, ...patch } : t));
+  };
+  const deleteTask = (id) => {
+    onTasksChange(group.tasks.filter(t => t.id !== id));
   };
 
-  const toggleTodo=(fid,sid,tid)=>{
-    let txt="";
-    setFields(prev=>prev.map(f=>{
-      if(f.id!==fid)return f;
-      if(sid)return{...f,sections:f.sections.map(s=>{
-        if(s.id!==sid)return s;
-        return{...s,todos:s.todos.map(t=>{if(t.id!==tid)return t;txt=t.text;return{...t,done:!t.done};})};
-      })};
-      return{...f,todos:f.todos.map(t=>{if(t.id!==tid)return t;txt=t.text;return{...t,done:!t.done};})};
-    }));
-    if(txt)addLog(`完了: ${txt}`);
-  };
-
-  const deleteTodo=(fid,sid,tid)=>{
-    let txt="";
-    setFields(prev=>prev.map(f=>{
-      if(f.id!==fid)return f;
-      if(sid)return{...f,sections:f.sections.map(s=>{
-        if(s.id!==sid)return s;
-        const t=s.todos.find(t=>t.id===tid);if(t)txt=t.text;
-        return{...s,todos:s.todos.filter(t=>t.id!==tid)};
-      })};
-      const t=f.todos.find(t=>t.id===tid);if(t)txt=t.text;
-      return{...f,todos:f.todos.filter(t=>t.id!==tid)};
-    }));
-    if(txt)addLog(`削除: ${txt}`);
-  };
-
-  const editTodoText=(fid,sid,tid,newText)=>{
-    setFields(prev=>prev.map(f=>{
-      if(f.id!==fid)return f;
-      if(sid)return{...f,sections:f.sections.map(s=>s.id!==sid?s:{...s,todos:s.todos.map(t=>t.id===tid?{...t,text:newText}:t)})};
-      return{...f,todos:f.todos.map(t=>t.id===tid?{...t,text:newText}:t)};
-    }));
-  };
-
-  const editSectionName=(fid,sid,newName)=>{
-    setFields(prev=>prev.map(f=>f.id!==fid?f:{...f,sections:f.sections.map(s=>s.id===sid?{...s,name:newName}:s)}));
-  };
-
-  const addTodo=(text,priority)=>{
-    if(!addingTodo)return;
-    const{fieldId:fid,sectionId:sid}=addingTodo;
-    const nid=Date.now();
-    setFields(prev=>prev.map(f=>{
-      if(f.id!==fid)return f;
-      if(sid)return{...f,sections:f.sections.map(s=>s.id!==sid?s:{...s,todos:[...s.todos,{id:nid,text,done:false,priority}]})};
-      return{...f,todos:[...f.todos,{id:nid,text,done:false,priority}]};
-    }));
-    addLog(`追加: ${text}`);
-    setAddingTodo(null);
-  };
-
-  const addSection=name=>{
-    if(!addingSection)return;
-    setFields(prev=>prev.map(f=>f.id!==addingSection?f:{...f,sections:[...f.sections,{id:`sec_${Date.now()}`,name,todos:[]}]}));
-    addLog(`エリア追加: ${name}`);
-    setAddingSection(null);
-  };
-
-  const addField=(name,emoji,color)=>{
-    setFields(prev=>[...prev,{id:`fld_${Date.now()}`,name,emoji,color,sections:[],todos:[]}]);
-    addLog(`地区追加: ${name}`);
-    setAddingField(false);
-  };
-
-  const saveFieldEdit=(fid,name,emoji,color)=>{
-    setFields(prev=>prev.map(f=>f.id!==fid?f:{...f,name,emoji,color}));
-    addLog(`地区編集: ${name}`);
-    setEditingField(null);
-  };
-
-  const deleteField=fid=>{
-    const f=fields.find(f=>f.id===fid);
-    setFields(prev=>prev.filter(f=>f.id!==fid));
-    addLog(`地区削除: ${f?.name}`);
-    setEditingField(null);
-  };
-
-  const clearDone=()=>{
-    setFields(prev=>prev.map(f=>({...f,todos:f.todos.filter(t=>!t.done),sections:f.sections.map(s=>({...s,todos:s.todos.filter(t=>!t.done)}))})));
-    addLog("完了タスクを一括クリア");
-    setShowClearDone(false);
-  };
-
-  // ドラッグ
-  const handleDragStart=(fid,sid,tid)=>{dragInfo.current={fid,sid,tid};};
-  const handleDrop=(tFid,tSid,tTid)=>{
-    const src=dragInfo.current;
-    if(!src||src.tid===tTid)return;
-    setFields(prev=>{
-      let dragged=null;
-      const next=prev.map(f=>{
-        if(f.id!==src.fid)return f;
-        if(src.sid)return{...f,sections:f.sections.map(s=>{
-          if(s.id!==src.sid)return s;
-          dragged=s.todos.find(t=>t.id===src.tid);
-          return{...s,todos:s.todos.filter(t=>t.id!==src.tid)};
-        })};
-        dragged=f.todos.find(t=>t.id===src.tid);
-        return{...f,todos:f.todos.filter(t=>t.id!==src.tid)};
-      });
-      if(!dragged)return prev;
-      return next.map(f=>{
-        if(f.id!==tFid)return f;
-        if(tSid)return{...f,sections:f.sections.map(s=>{
-          if(s.id!==tSid)return s;
-          const idx=s.todos.findIndex(t=>t.id===tTid);
-          const a=[...s.todos];a.splice(idx,0,dragged);return{...s,todos:a};
-        })};
-        const idx=f.todos.findIndex(t=>t.id===tTid);
-        const a=[...f.todos];a.splice(idx,0,dragged);return{...f,todos:a};
-      });
-    });
-    dragInfo.current=null;
-  };
-
-  // 長押し（地区ヘッダー）
-  const handleLongPressStart=(e,field)=>{
-    e.preventDefault();
-    longPressTimer.current=setTimeout(()=>setEditingField(field),500);
-  };
-  const handleLongPressEnd=()=>{
-    clearTimeout(longPressTimer.current);
-  };
-
-  const ft=todos=>showDone?todos:todos.filter(t=>!t.done);
-  const totalPending=fields.reduce((a,f)=>a+f.todos.filter(t=>!t.done).length+f.sections.reduce((b,s)=>b+s.todos.filter(t=>!t.done).length,0),0);
-  const totalDone=fields.reduce((a,f)=>a+f.todos.filter(t=>t.done).length+f.sections.reduce((b,s)=>b+s.todos.filter(t=>t.done).length,0),0);
-
-  return(
-    <div style={{position:"fixed",inset:0,background:"linear-gradient(160deg,#1a2e22 0%,#2d1a0a 100%)",display:"flex",flexDirection:"column",fontFamily:"'Noto Sans JP','Hiragino Kaku Gothic ProN',sans-serif",overflow:"hidden"}}>
-      {/* ヘッダー */}
-      <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px 8px",borderBottom:"1px solid rgba(255,255,255,0.1)",flexShrink:0}}>
-        <span style={{fontSize:18}}>🌾</span>
-        <EditableText value={appTitle} onSave={setAppTitle}
-          style={{fontSize:15,fontWeight:700,color:"#fff",letterSpacing:1}}/>
-        <span style={{fontSize:11,background:"#d94040",color:"#fff",borderRadius:10,padding:"1px 8px",fontWeight:700}}>{totalPending}</span>
-        <div style={{flex:1}}/>
-        {totalDone>0&&(
-          <button onClick={()=>setShowClearDone(true)} style={{fontSize:11,color:"rgba(255,255,255,0.6)",background:"rgba(255,255,255,0.08)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:7,padding:"4px 10px",cursor:"pointer"}}>
-            ✅{totalDone}件クリア
-          </button>
-        )}
-        <button onClick={()=>setShowDone(v=>!v)} style={{fontSize:11,color:showDone?"#fff":"rgba(255,255,255,0.45)",background:showDone?"rgba(255,255,255,0.18)":"transparent",border:"1px solid rgba(255,255,255,0.22)",borderRadius:7,padding:"4px 10px",cursor:"pointer"}}>
-          完了{showDone?"▲":"▼"}
-        </button>
-        <button onClick={()=>setAddingField(true)} style={{fontSize:11,color:"rgba(255,255,255,0.7)",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.22)",borderRadius:7,padding:"4px 10px",cursor:"pointer"}}>
-          ＋地区
-        </button>
-      </div>
-
-      {/* グリッド：2列・overflow hidden・折り返し */}
-      <div style={{
-        flex:1,overflow:"hidden",
-        display:"grid",
-        gridTemplateColumns:"1fr 1fr",
-        gridAutoRows:"min-content",
-        alignContent:"start",
-        gap:8,padding:8,
-      }}>
-        {fields.map(field=>{
-          const pending=field.todos.filter(t=>!t.done).length+field.sections.reduce((a,s)=>a+s.todos.filter(t=>!t.done).length,0);
-          const ftodos=ft(field.todos);
-          const hasContent=ftodos.length>0||field.sections.some(s=>ft(s.todos).length>0||true);
-
-          return(
-            <div key={field.id} style={{
-              background:hexToRgba(field.color,0.12),
-              borderRadius:12,border:`1.5px solid ${field.color}66`,
-              display:"flex",flexDirection:"column",
-              overflow:"hidden",minWidth:0,
-              // ← height:fit-content で中身だけの高さに
-              height:"fit-content",
-            }}>
-              {/* 地区ヘッダー（長押しで編集） */}
-              <div
-                onMouseDown={e=>handleLongPressStart(e,field)}
-                onMouseUp={handleLongPressEnd}
-                onMouseLeave={handleLongPressEnd}
-                onTouchStart={e=>handleLongPressStart(e,field)}
-                onTouchEnd={handleLongPressEnd}
-                style={{background:`linear-gradient(135deg,${field.color}dd,${field.color}99)`,padding:"8px 10px",display:"flex",alignItems:"center",gap:6,flexShrink:0,cursor:"pointer",userSelect:"none"}}
-              >
-                <span style={{fontSize:14}}>{field.emoji}</span>
-                <EditableText value={field.name} onSave={v=>setFields(prev=>prev.map(f=>f.id===field.id?{...f,name:v}:f))}
-                  style={{fontSize:13,fontWeight:700,color:"#fff",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}/>
-                {pending>0&&<span style={{fontSize:10,background:"rgba(255,255,255,0.28)",color:"#fff",borderRadius:8,padding:"1px 6px",fontWeight:700,flexShrink:0}}>{pending}</span>}
-                <button onClick={e=>{e.stopPropagation();setAddingSection(field.id);}} title="エリア追加" style={iconBtn}>⊕</button>
-                <button onClick={e=>{e.stopPropagation();setEditingField(field);}} title="編集・削除" style={{...iconBtn,background:"rgba(255,255,255,0.15)"}}>⋯</button>
-              </div>
-
-              {/* コンテンツ */}
-              <div style={{padding:"6px 6px 5px"}}>
-                {ftodos.length>0&&(
-                  <div style={{marginBottom:field.sections.length?5:0}}>
-                    {ftodos.map(todo=>(
-                      <TodoRow key={todo.id} todo={todo}
-                        onToggle={()=>toggleTodo(field.id,null,todo.id)}
-                        onDelete={()=>deleteTodo(field.id,null,todo.id)}
-                        onEditText={v=>editTodoText(field.id,null,todo.id,v)}
-                        onDragStart={()=>handleDragStart(field.id,null,todo.id)}
-                        onDragOver={()=>{}}
-                        onDrop={()=>handleDrop(field.id,null,todo.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {field.sections.map(section=>{
-                  const stodos=ft(section.todos);
-                  const sp=section.todos.filter(t=>!t.done).length;
-                  return(
-                    <div key={section.id} style={{background:hexToRgba(field.color,0.18),borderRadius:8,marginBottom:4,overflow:"hidden",border:`1px solid ${field.color}44`}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 10px",background:`${field.color}33`}}>
-                        <EditableText value={section.name} onSave={v=>editSectionName(field.id,section.id,v)}
-                          style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,0.85)",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}/>
-                        {sp>0&&<span style={{fontSize:10,background:`${field.color}cc`,color:"#fff",borderRadius:6,padding:"1px 6px",fontWeight:700}}>{sp}</span>}
-                        <button onClick={()=>setAddingTodo({fieldId:field.id,sectionId:section.id})} style={{background:"rgba(255,255,255,0.15)",border:"none",color:"rgba(255,255,255,0.8)",fontSize:16,cursor:"pointer",padding:0,width:24,height:24,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                      </div>
-                      <div style={{padding:"4px 6px 5px"}}>
-                        {stodos.length===0
-                          ?<div style={{fontSize:10,color:"rgba(255,255,255,0.25)",padding:"2px 2px"}}>なし ✓</div>
-                          :stodos.map(todo=>(
-                            <TodoRow key={todo.id} todo={todo}
-                              onToggle={()=>toggleTodo(field.id,section.id,todo.id)}
-                              onDelete={()=>deleteTodo(field.id,section.id,todo.id)}
-                              onEditText={v=>editTodoText(field.id,section.id,todo.id,v)}
-                              onDragStart={()=>handleDragStart(field.id,section.id,todo.id)}
-                              onDragOver={()=>{}}
-                              onDrop={()=>handleDrop(field.id,section.id,todo.id)}
-                            />
-                          ))
-                        }
-                      </div>
-                    </div>
-                  );
-                })}
-
-                <button onClick={()=>setAddingTodo({fieldId:field.id,sectionId:null})} style={{width:"100%",background:"transparent",border:`1.5px dashed ${field.color}66`,borderRadius:8,color:`${field.color}cc`,fontSize:12,padding:"7px 0",cursor:"pointer",marginTop:2,fontWeight:600}}>＋ タスク追加</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ログパネル */}
-      <LogPanel logs={logs}/>
-
-      {/* モーダル */}
-      {addingTodo    &&<AddTodoModal    target={addingTodo} fields={fields} onAdd={addTodo} onClose={()=>setAddingTodo(null)}/>}
-      {addingSection &&<AddSectionModal fieldId={addingSection} fields={fields} onAdd={addSection} onClose={()=>setAddingSection(null)}/>}
-      {addingField   &&<AddFieldModal   fields={fields} onAdd={addField} onClose={()=>setAddingField(false)}/>}
-      {editingField  &&<FieldEditModal  field={editingField} onSave={(n,e,c)=>saveFieldEdit(editingField.id,n,e,c)} onDelete={()=>deleteField(editingField.id)} onClose={()=>setEditingField(null)}/>}
-      {showClearDone &&<ClearDoneModal  count={totalDone} onClear={clearDone} onClose={()=>setShowClearDone(false)}/>}
-    </div>
-  );
-}
-
-/* ── 作業ログパネル ── */
-function LogPanel({logs}){
-  const [open,setOpen]=useState(false);
-  return(
-    <>
-      <div style={{flexShrink:0,borderTop:"1px solid rgba(255,255,255,0.1)",padding:"6px 14px",display:"flex",alignItems:"center",gap:8,background:"rgba(0,0,0,0.2)"}}>
-        <button onClick={()=>setOpen(v=>!v)} style={{fontSize:11,color:"rgba(255,255,255,0.55)",background:"transparent",border:"1px solid rgba(255,255,255,0.15)",borderRadius:6,padding:"4px 12px",cursor:"pointer"}}>
-          📋 作業ログ {open?"▼":"▲"}
-        </button>
-        {logs.length>0&&<span style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{logs.length}件</span>}
-      </div>
-      {open&&(
-        <div style={{flexShrink:0,maxHeight:"30vh",overflowY:"auto",background:"rgba(0,0,0,0.35)",borderTop:"1px solid rgba(255,255,255,0.08)",padding:"8px 12px"}}>
-          {logs.length===0
-            ?<div style={{fontSize:11,color:"rgba(255,255,255,0.25)",textAlign:"center",padding:"12px 0"}}>ログはまだありません</div>
-            :logs.map((log,i)=>(
-              <div key={i} style={{display:"flex",gap:10,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                <span style={{fontSize:10,color:"rgba(255,255,255,0.3)",flexShrink:0,whiteSpace:"nowrap"}}>{log.time}</span>
-                <span style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>{log.text}</span>
-              </div>
-            ))
-          }
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {group.name && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: 5, padding: "3px 2px"
+        }}>
+          <span style={{ fontSize: 11, fontWeight: "bold", color: "#bbb" }}>{group.name}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{
+              background: "#444", color: "#fff", borderRadius: "50%",
+              width: 17, height: 17, fontSize: 10, display: "flex",
+              alignItems: "center", justifyContent: "center"
+            }}>{group.tasks.filter(t => !t.done).length}</span>
+            <button onClick={addTask} style={{
+              background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 4,
+              color: "#aaa", cursor: "pointer", width: 18, height: 18, fontSize: 13,
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>+</button>
+          </div>
         </div>
       )}
-    </>
+      {group.tasks.map(task => (
+        <TaskItem key={task.id} task={task}
+          onToggle={() => updateTask(task.id, { done: !task.done })}
+          onDelete={() => deleteTask(task.id)}
+          onPriorityChange={p => updateTask(task.id, { priority: p })}
+          onTextChange={t => updateTask(task.id, { text: t })}
+        />
+      ))}
+      {!group.name && (
+        <button onClick={addTask} style={{
+          width: "100%", padding: "5px", background: "transparent",
+          border: "1px dashed #3a3a4a", borderRadius: 6,
+          color: "#666", cursor: "pointer", fontSize: 11, marginTop: 2
+        }}>＋ タスク追加</button>
+      )}
+    </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<FarmTodo />)
+function AreaCard({ area, onUpdate, onDelete }) {
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [editName, setEditName] = useState(false);
+  const [nameVal, setNameVal] = useState(area.name);
+  const emojiRef = useRef();
+
+  const totalTasks = area.groups.reduce((s, g) => s + g.tasks.filter(t => !t.done).length, 0);
+
+  const updateGroup = (gid, tasks) => {
+    onUpdate({ ...area, groups: area.groups.map(g => g.id === gid ? { ...g, tasks } : g) });
+  };
+  const addGroup = () => {
+    onUpdate({ ...area, groups: [...area.groups, { id: uid(), name: `圃場${area.groups.length + 1}`, tasks: [] }] });
+  };
+
+  return (
+    // breakInside: avoid が大事 — カード途中で列を跨がない
+    <div style={{
+      background: area.color + "cc",
+      borderRadius: 12, padding: 10, marginBottom: 10,
+      border: `1px solid ${area.color}88`,
+      breakInside: "avoid",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <div style={{ position: "relative" }} ref={emojiRef}>
+          <button onClick={() => setShowEmoji(v => !v)} style={{
+            background: "transparent", border: "none",
+            fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0
+          }}>{area.emoji}</button>
+          {showEmoji && (
+            <EmojiPicker current={area.emoji}
+              onSelect={e => onUpdate({ ...area, emoji: e })}
+              onClose={() => setShowEmoji(false)} />
+          )}
+        </div>
+        {editName ? (
+          <input autoFocus value={nameVal}
+            onChange={e => setNameVal(e.target.value)}
+            onBlur={() => { onUpdate({ ...area, name: nameVal }); setEditName(false); }}
+            onKeyDown={e => e.key === "Enter" && e.target.blur()}
+            style={{
+              background: "transparent", border: "none",
+              borderBottom: "1px solid #fff", color: "#fff",
+              fontSize: 13, fontWeight: "bold", outline: "none", flex: 1
+            }}
+          />
+        ) : (
+          <span onClick={() => setEditName(true)} style={{
+            flex: 1, fontWeight: "bold", fontSize: 13, color: "#fff", cursor: "text"
+          }}>{area.name}</span>
+        )}
+        <span style={{
+          background: "#55558888", color: "#fff", borderRadius: "50%",
+          width: 18, height: 18, fontSize: 10, display: "flex",
+          alignItems: "center", justifyContent: "center", flexShrink: 0
+        }}>{totalTasks}</span>
+        <button onClick={addGroup} style={{
+          background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 5,
+          color: "#fff", cursor: "pointer", width: 22, height: 22, fontSize: 15,
+          display: "flex", alignItems: "center", justifyContent: "center"
+        }}>+</button>
+        <button onClick={onDelete} style={{
+          background: "transparent", border: "none", color: "#aaa", cursor: "pointer", fontSize: 13
+        }}>…</button>
+      </div>
+
+      {/* Groups */}
+      {area.groups.map(g => (
+        <GroupSection key={g.id} group={g} onTasksChange={tasks => updateGroup(g.id, tasks)} />
+      ))}
+      {area.groups.length === 0 && (
+        <button onClick={addGroup} style={{
+          width: "100%", padding: "7px", background: "transparent",
+          border: "1px dashed #555", borderRadius: 6, color: "#888", cursor: "pointer", fontSize: 11
+        }}>＋ タスク追加</button>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [areas, setAreas] = useState(initialAreas);
+  const [showAddArea, setShowAddArea] = useState(false);
+  const [newAreaName, setNewAreaName] = useState("");
+  const [newAreaEmoji, setNewAreaEmoji] = useState("🌾");
+  const [showNewEmoji, setShowNewEmoji] = useState(false);
+
+  const updateArea = (updated) => setAreas(areas.map(a => a.id === updated.id ? updated : a));
+  const deleteArea = (id) => setAreas(areas.filter(a => a.id !== id));
+
+  const addArea = () => {
+    if (!newAreaName.trim()) return;
+    const colors = ["#3d5e8f","#5b8f3d","#8f3d5b","#8f7c3d","#3d8f7c","#5b3d8f","#7c5c1e"];
+    setAreas([...areas, {
+      id: uid(), name: newAreaName, emoji: newAreaEmoji,
+      color: colors[areas.length % colors.length],
+      groups: [{ id: uid(), name: null, tasks: [] }]
+    }]);
+    setNewAreaName(""); setNewAreaEmoji("🌾"); setShowAddArea(false);
+  };
+
+  const totalIncomplete = areas.reduce((s, a) =>
+    s + a.groups.reduce((gs, g) => gs + g.tasks.filter(t => !t.done).length, 0), 0);
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#12121c",
+      fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
+      color: "#fff",
+    }}>
+      {/* Global CSS for column break indicators */}
+      <style>{`
+        .card-column {
+          columns: 2;
+          column-gap: 10px;
+          padding: 10px;
+          column-rule: 2px dashed #2a2a3a;
+        }
+        /* カードが列をまたいで切れた上端に点線 */
+        .area-card-wrap {
+          display: inline-block;
+          width: 100%;
+          break-inside: avoid;
+          margin-bottom: 10px;
+        }
+        /* 列の区切り線の上下に点線バッジ */
+        .col-break-top {
+          border-top: 2px dashed #3a3a55;
+          margin-bottom: 6px;
+          position: relative;
+        }
+        .col-break-top::before {
+          content: "↑ 続き";
+          position: absolute;
+          top: -9px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #12121c;
+          color: #555;
+          font-size: 9px;
+          padding: 0 4px;
+          white-space: nowrap;
+        }
+        .col-break-bottom {
+          border-bottom: 2px dashed #3a3a55;
+          margin-top: 6px;
+          position: relative;
+        }
+        .col-break-bottom::after {
+          content: "続き ↓";
+          position: absolute;
+          bottom: -9px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #12121c;
+          color: #555;
+          font-size: 9px;
+          padding: 0 4px;
+          white-space: nowrap;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "14px 16px 10px",
+        background: "#12121c", position: "sticky", top: 0, zIndex: 20,
+        borderBottom: "1px solid #2a2a3a"
+      }}>
+        <span style={{ fontSize: 22 }}>🌾</span>
+        <span style={{ fontWeight: "bold", fontSize: 17 }}>圃場 ToDo</span>
+        <span style={{
+          background: "#e53e3e", color: "#fff", borderRadius: "50%",
+          width: 22, height: 22, fontSize: 12, display: "flex",
+          alignItems: "center", justifyContent: "center", fontWeight: "bold"
+        }}>{totalIncomplete}</span>
+        <div style={{ flex: 1 }} />
+        <button style={{
+          background: "#2a2a3a", border: "none", borderRadius: 8,
+          color: "#aaa", padding: "6px 12px", fontSize: 12, cursor: "pointer"
+        }}>完了▼</button>
+        <button onClick={() => setShowAddArea(true)} style={{
+          background: "#2a2a3a", border: "none", borderRadius: 8,
+          color: "#aaa", padding: "6px 12px", fontSize: 12, cursor: "pointer"
+        }}>＋地区</button>
+      </div>
+
+      {/* Add area modal */}
+      {showAddArea && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)",
+          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#1e1e30", borderRadius: 16, padding: 20, width: 300,
+            border: "1px solid #444"
+          }}>
+            <div style={{ fontWeight: "bold", marginBottom: 14, fontSize: 15 }}>新しい地区を追加</div>
+            <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center" }}>
+              <div style={{ position: "relative" }}>
+                <button onClick={() => setShowNewEmoji(v => !v)} style={{
+                  background: "#2a2a3a", border: "none", borderRadius: 8,
+                  fontSize: 22, cursor: "pointer", padding: "6px 10px"
+                }}>{newAreaEmoji}</button>
+                {showNewEmoji && (
+                  <EmojiPicker current={newAreaEmoji}
+                    onSelect={e => setNewAreaEmoji(e)}
+                    onClose={() => setShowNewEmoji(false)} />
+                )}
+              </div>
+              <input placeholder="地区名" value={newAreaName}
+                onChange={e => setNewAreaName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addArea()}
+                style={{
+                  flex: 1, background: "#2a2a3a", border: "1px solid #444",
+                  borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 14, outline: "none"
+                }} />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setShowAddArea(false)} style={{
+                flex: 1, padding: "8px", background: "#333", border: "none",
+                borderRadius: 8, color: "#aaa", cursor: "pointer"
+              }}>キャンセル</button>
+              <button onClick={addArea} style={{
+                flex: 1, padding: "8px", background: "#5b3d8f", border: "none",
+                borderRadius: 8, color: "#fff", cursor: "pointer", fontWeight: "bold"
+              }}>追加</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ★ CSS columns layout — 左列が埋まったら自動で右列に流れる */}
+      <div className="card-column">
+        {areas.map(area => (
+          <div key={area.id} className="area-card-wrap">
+            <AreaCard area={area} onUpdate={updateArea} onDelete={() => deleteArea(area.id)} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
