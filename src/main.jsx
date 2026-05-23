@@ -256,24 +256,28 @@ function Group({ group, onChange, onAddTask, onDelete }) {
 
   return (
     <div style={{ marginBottom:4 }}>
-      {group.name && (
-        <div
-          {...lp}
-          onTouchStart={(e) => { lp.onTouchStart(e); }}
-          style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
-            marginBottom:3, cursor:"context-menu", userSelect:"none" }}>
-          <span style={{ fontSize:10, fontWeight:"bold", color:"#bbb" }}>{group.name}</span>
-          <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
+        {group.name
+          ? <span
+              {...lp}
+              onTouchStart={(e) => { lp.onTouchStart(e); }}
+              style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"context-menu", userSelect:"none", flex:1 }}>
+              {group.name}
+            </span>
+          : <span style={{ flex:1 }} />
+        }
+        <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+          {group.name && (
             <span style={{ background:"#444", color:"#fff", borderRadius:"50%", width:14, height:14,
               fontSize:9, display:"flex", alignItems:"center", justifyContent:"center" }}>
               {group.tasks.filter(t => !t.done).length}
             </span>
-            <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
-              borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
-              display:"flex", alignItems:"center", justifyContent:"center" }}>+</button>
-          </div>
+          )}
+          <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
+            borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
+            display:"flex", alignItems:"center", justifyContent:"center" }}>➕</button>
         </div>
-      )}
+      </div>
       {group.tasks.map((t, i) => (
         <Task key={t.id} task={t}
           onChange={updTask}
@@ -286,10 +290,7 @@ function Group({ group, onChange, onAddTask, onDelete }) {
           }}
         />
       ))}
-      <button onClick={onAddTask} style={{ width:"100%", padding:"3px", background:"transparent",
-        border:"1px dashed #3a3a4a", borderRadius:4, color:"#666", cursor:"pointer", fontSize:10, marginTop:1 }}>
-        ＋ タスク追加
-      </button>
+
 
       {menu && (
         <ContextMenu
@@ -328,31 +329,48 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
     { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
 
-  const handleHeaderLongPress = (e) => {
-    const rect = e.currentTarget?.getBoundingClientRect?.() || {};
-    const x = e.touches ? e.touches[0].clientX : (e.clientX || rect.left + 40);
-    const y = e.touches ? e.touches[0].clientY : (e.clientY || rect.bottom);
-    setMenu({ x, y });
-  };
+  const lpTimer = useRef(null);
+  const touchPos = useRef({ x:0, y:0 });
+  const didLongPress = useRef(false);
 
-  const headerLP = useLongPress((e) => handleHeaderLongPress(e));
+  const nameTouchStart = (e) => {
+    didLongPress.current = false;
+    const t = e.touches[0];
+    touchPos.current = { x: t.clientX, y: t.clientY };
+    lpTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setMenu({ x: touchPos.current.x, y: touchPos.current.y });
+    }, 500);
+  };
+  const nameTouchEnd = () => clearTimeout(lpTimer.current);
+  const nameMouseDown = (e) => {
+    didLongPress.current = false;
+    touchPos.current = { x: e.clientX, y: e.clientY };
+    lpTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setMenu({ x: touchPos.current.x, y: touchPos.current.y });
+    }, 500);
+  };
+  const nameMouseUp = () => clearTimeout(lpTimer.current);
+  const nameClick = () => { if (!didLongPress.current) setEditOpen(true); };
 
   return (
     <div style={{ background: area.color+"bb", borderRadius:10, padding:8, border:`1px solid ${area.color}99` }}>
-      <div
-        onTouchStart={(e) => {
-          const touch = e.touches[0];
-          headerLP.onTouchStart({ clientX: touch.clientX, clientY: touch.clientY });
-        }}
-        onTouchEnd={headerLP.onTouchEnd}
-        onTouchMove={headerLP.onTouchMove}
-        onMouseDown={(e) => headerLP.onMouseDown(e)}
-        onMouseUp={headerLP.onMouseUp}
-        onMouseLeave={headerLP.onMouseLeave}
-        style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6,
-          cursor:"context-menu", userSelect:"none" }}>
-        <span style={{ fontSize:18, lineHeight:1 }}>{area.emoji}</span>
-        <span style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff" }}>{area.name}</span>
+      <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
+        <span onClick={nameClick} style={{ fontSize:18, lineHeight:1, cursor:"pointer" }}>
+          {area.emoji}
+        </span>
+        <span
+          onClick={nameClick}
+          onTouchStart={nameTouchStart}
+          onTouchEnd={nameTouchEnd}
+          onTouchMove={nameTouchEnd}
+          onMouseDown={nameMouseDown}
+          onMouseUp={nameMouseUp}
+          onMouseLeave={nameMouseUp}
+          style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff", cursor:"pointer", userSelect:"none" }}>
+          {area.name}
+        </span>
         <span style={{ background:"#44444488", color:"#fff", borderRadius:"50%", width:16, height:16,
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
