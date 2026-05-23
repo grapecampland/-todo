@@ -286,12 +286,10 @@ function Group({ group, onChange, onAddTask, onDelete }) {
           }}
         />
       ))}
-      {!group.name && (
-        <button onClick={onAddTask} style={{ width:"100%", padding:"3px", background:"transparent",
-          border:"1px dashed #3a3a4a", borderRadius:4, color:"#666", cursor:"pointer", fontSize:10, marginTop:1 }}>
-          ＋ タスク追加
-        </button>
-      )}
+      <button onClick={onAddTask} style={{ width:"100%", padding:"3px", background:"transparent",
+        border:"1px dashed #3a3a4a", borderRadius:4, color:"#666", cursor:"pointer", fontSize:10, marginTop:1 }}>
+        ＋ タスク追加
+      </button>
 
       {menu && (
         <ContextMenu
