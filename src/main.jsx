@@ -3,8 +3,7 @@ import { createRoot } from "react-dom/client";
 
 const PRIORITIES = ["急", "中", "低"];
 const P_COLOR = { 急: "#ef4444", 中: "#f97316", 低: "#22c55e" };
-
-const EMOJIS = ["🌾","🍇","🫛","🌽","🍅","🥬","🌿","🌱","🪴","🌳","🚜","🐓","🐄","🐝","🍷","🌊","🏔️","☀️","🌸","🌺","🌻","🌹","💐","🔥","✅","⭐","🌟","🎋","🦁","🐯","🐻","🐼","🦊","🌵","🎍","🏕","🌄","🌅","💧","🪣","🔨","⛏️","📋","🗓️","⏰","🔔","🎵","🎨","❤️","🧡","💛","💚","💙","💜"];
+const EMOJIS = ["🌾","🍇","🫛","🌽","🍅","🥬","🌿","🌱","🪴","🌳","🚜","🐓","🐄","🐝","🍷","🌊","🏔️","☀️","🌸","🌺","🌻","🌹","💐","🔥","✅","⭐","🌟","🎋","🦁","🐯","🐻","🐼","🦊","🌵","🎍","🏕️","🌄","🌅","💧","🪣","🔨","⛏️","📋","🗓️","⏰","🔔","🎵","🎨","❤️","🧡","💛","💚","💙","💜"];
 
 let _id = 100;
 const nid = () => String(_id++);
@@ -58,7 +57,7 @@ function EmojiPicker({ value, onChange }) {
   return (
     <div ref={ref} style={{ position:"relative", display:"inline-block" }}>
       <button onClick={() => setOpen(v => !v)}
-        style={{ background:"transparent", border:"none", fontSize:20, cursor:"pointer", padding:0, lineHeight:1 }}>
+        style={{ background:"transparent", border:"none", fontSize:18, cursor:"pointer", padding:0, lineHeight:1 }}>
         {value}
       </button>
       {open && (
@@ -72,7 +71,7 @@ function EmojiPicker({ value, onChange }) {
           {EMOJIS.map(e => (
             <button key={e} onClick={() => { onChange(e); setOpen(false); }}
               style={{ background: e===value?"#333":"transparent", border:"none", borderRadius:4,
-                fontSize:17, cursor:"pointer", padding:2, lineHeight:1.3 }}>
+                fontSize:16, cursor:"pointer", padding:2, lineHeight:1.3 }}>
               {e}
             </button>
           ))}
@@ -87,62 +86,61 @@ function Task({ task, onChange, onDelete }) {
   const [v, setV] = useState(task.text);
   const c = P_COLOR[task.pri];
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 7px",
-      background:"rgba(255,255,255,0.04)", borderRadius:7, marginBottom:3 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
+      background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2 }}>
       <button onClick={() => onChange({ ...task, done:!task.done })}
-        style={{ width:19, height:19, borderRadius:"50%", border:`2px solid ${c}`,
+        style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
           background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
       {editing
         ? <input autoFocus value={v} onChange={e => setV(e.target.value)}
             onBlur={() => { onChange({ ...task, text:v }); setEditing(false); }}
             onKeyDown={e => e.key==="Enter" && e.target.blur()}
             style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
-              color:"#fff", fontSize:12, outline:"none" }} />
+              color:"#fff", fontSize:11, outline:"none" }} />
         : <span onClick={() => setEditing(true)}
-            style={{ flex:1, fontSize:12, color: task.done?"#555":"#ddd",
-              textDecoration: task.done?"line-through":"none", cursor:"text", lineHeight:1.4 }}>
+            style={{ flex:1, fontSize:11, color: task.done?"#555":"#ddd",
+              textDecoration: task.done?"line-through":"none", cursor:"text", lineHeight:1.3 }}>
             {task.text}
           </span>
       }
       <button onClick={() => {
         const i = PRIORITIES.indexOf(task.pri);
         onChange({ ...task, pri: PRIORITIES[(i+1) % PRIORITIES.length] });
-      }} style={{ fontSize:10, fontWeight:"bold", color:c, background:"transparent",
-          border:"none", cursor:"pointer", padding:"1px 3px", flexShrink:0 }}>
+      }} style={{ fontSize:9, fontWeight:"bold", color:c, background:"transparent",
+          border:"none", cursor:"pointer", padding:"1px 2px", flexShrink:0 }}>
         {task.pri}
       </button>
       <button onClick={onDelete}
-        style={{ color:"#555", background:"transparent", border:"none", cursor:"pointer", fontSize:12, flexShrink:0 }}>
+        style={{ color:"#555", background:"transparent", border:"none", cursor:"pointer", fontSize:11, flexShrink:0 }}>
         ×
       </button>
     </div>
   );
 }
 
-function Group({ group, onChange }) {
-  const add = () => onChange({ ...group, tasks:[...group.tasks, { id:nid(), text:"新タスク", pri:"中", done:false }] });
+function Group({ group, onChange, onAddTask, full }) {
   const upd = (t) => onChange({ ...group, tasks: group.tasks.map(x => x.id===t.id ? t : x) });
   const del = (id) => onChange({ ...group, tasks: group.tasks.filter(x => x.id!==id) });
   return (
-    <div style={{ marginBottom:6 }}>
+    <div style={{ marginBottom:4 }}>
       {group.name && (
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-          <span style={{ fontSize:11, fontWeight:"bold", color:"#bbb" }}>{group.name}</span>
-          <div style={{ display:"flex", gap:4, alignItems:"center" }}>
-            <span style={{ background:"#444", color:"#fff", borderRadius:"50%", width:16, height:16,
-              fontSize:10, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
+          <span style={{ fontSize:10, fontWeight:"bold", color:"#bbb" }}>{group.name}</span>
+          <div style={{ display:"flex", gap:3, alignItems:"center" }}>
+            <span style={{ background:"#444", color:"#fff", borderRadius:"50%", width:14, height:14,
+              fontSize:9, display:"flex", alignItems:"center", justifyContent:"center" }}>
               {group.tasks.filter(t => !t.done).length}
             </span>
-            <button onClick={add} style={{ background:"rgba(255,255,255,0.1)", border:"none",
-              borderRadius:4, color:"#aaa", cursor:"pointer", width:17, height:17, fontSize:12,
+            <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
+              borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
               display:"flex", alignItems:"center", justifyContent:"center" }}>+</button>
           </div>
         </div>
       )}
       {group.tasks.map(t => <Task key={t.id} task={t} onChange={upd} onDelete={() => del(t.id)} />)}
       {!group.name && (
-        <button onClick={add} style={{ width:"100%", padding:"4px", background:"transparent",
-          border:"1px dashed #3a3a4a", borderRadius:5, color:"#666", cursor:"pointer", fontSize:11, marginTop:2 }}>
+        <button onClick={onAddTask} style={{ width:"100%", padding:"3px", background:"transparent",
+          border:"1px dashed #3a3a4a", borderRadius:4, color:"#666", cursor:"pointer", fontSize:10, marginTop:1 }}>
           ＋ タスク追加
         </button>
       )}
@@ -150,47 +148,44 @@ function Group({ group, onChange }) {
   );
 }
 
-function AreaCard({ area, onUpdate, onDelete }) {
+function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(area.name);
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
   const updGroup = (g) => onUpdate({ ...area, groups: area.groups.map(x => x.id===g.id ? g : x) });
-  const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
-    { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
   return (
     <div style={{
-      background: area.color+"bb", borderRadius:12, padding:10,
-      border:`1px solid ${area.color}77`,
-      breakInside:"avoid", WebkitColumnBreakInside:"avoid",
-      display:"inline-block", width:"100%", boxSizing:"border-box", marginBottom:10,
+      background: area.color+"bb", borderRadius:10, padding:8,
+      border:`1px solid ${area.color}77`, marginBottom:6,
     }}>
-      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
         <EmojiPicker value={area.emoji} onChange={e => onUpdate({ ...area, emoji:e })} />
         {editingName
           ? <input autoFocus value={nameVal} onChange={e => setNameVal(e.target.value)}
               onBlur={() => { onUpdate({ ...area, name:nameVal }); setEditingName(false); }}
               onKeyDown={e => e.key==="Enter" && e.target.blur()}
               style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #fff",
-                color:"#fff", fontSize:13, fontWeight:"bold", outline:"none" }} />
+                color:"#fff", fontSize:12, fontWeight:"bold", outline:"none" }} />
           : <span onClick={() => setEditingName(true)}
-              style={{ flex:1, fontWeight:"bold", fontSize:13, color:"#fff", cursor:"text" }}>
+              style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff", cursor:"text" }}>
               {area.name}
             </span>
         }
-        <span style={{ background:"#44444488", color:"#fff", borderRadius:"50%", width:17, height:17,
-          fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <span style={{ background:"#44444488", color:"#fff", borderRadius:"50%", width:16, height:16,
+          fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
-        <button onClick={addGroup}
-          style={{ background:"rgba(255,255,255,0.12)", border:"none", borderRadius:5, color:"#fff",
-            cursor:"pointer", width:20, height:20, fontSize:14, display:"flex",
-            alignItems:"center", justifyContent:"center" }}>+</button>
         <button onClick={onDelete}
-          style={{ background:"transparent", border:"none", color:"#aaa", cursor:"pointer", fontSize:13 }}>
+          style={{ background:"transparent", border:"none", color:"#aaa", cursor:"pointer", fontSize:12 }}>
           …
         </button>
       </div>
-      {area.groups.map(g => <Group key={g.id} group={g} onChange={updGroup} />)}
+      {area.groups.map(g => (
+        <Group key={g.id} group={g}
+          onChange={updGroup}
+          onAddTask={() => onAddTask(area.id, g.id)}
+        />
+      ))}
     </div>
   );
 }
@@ -200,8 +195,47 @@ function App() {
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
+  const [toast, setToast] = useState(false);
+
+  // 2列コンテナのref — 高さを測って満杯かチェック
+  const colRef = useRef();
+
   const upd = (a) => setAreas(prev => prev.map(x => x.id===a.id ? a : x));
   const del = (id) => setAreas(prev => prev.filter(x => x.id!==id));
+
+  const isFull = () => {
+    const el = colRef.current;
+    if (!el) return false;
+    // scrollHeight > clientHeight なら溢れてる
+    return el.scrollHeight > el.clientHeight + 4;
+  };
+
+  const addTask = (areaId, groupId) => {
+    // 一時的に追加してみて溢れたら取り消す
+    const newTask = { id: nid(), text: "新タスク", pri: "中", done: false };
+    setAreas(prev => {
+      const next = prev.map(a => a.id !== areaId ? a : {
+        ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
+          ...g, tasks: [...g.tasks, newTask]
+        })
+      });
+      return next;
+    });
+    // 次のフレームで溢れチェック
+    setTimeout(() => {
+      if (isFull()) {
+        // 取り消し
+        setAreas(prev => prev.map(a => a.id !== areaId ? a : {
+          ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
+            ...g, tasks: g.tasks.filter(t => t.id !== newTask.id)
+          })
+        }));
+        setToast(true);
+        setTimeout(() => setToast(false), 2500);
+      }
+    }, 30);
+  };
+
   const addArea = () => {
     if (!newName.trim()) return;
     const COLORS = ["#3d5e8f","#5b8f3d","#8f3d5b","#8f7c3d","#3d8f7c"];
@@ -212,25 +246,43 @@ function App() {
     }]);
     setNewName(""); setNewEmoji("🌾"); setModal(false);
   };
+
   const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
   return (
-    <div style={{ minHeight:"100vh", background:"#12121c",
-      fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif", color:"#fff" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"13px 14px 10px",
-        borderBottom:"1px solid #2a2a3a", position:"sticky", top:0, background:"#12121c", zIndex:20 }}>
-        <span style={{ fontSize:21 }}>🌾</span>
-        <span style={{ fontWeight:"bold", fontSize:16 }}>圃場 ToDo</span>
-        <span style={{ background:"#e53e3e", color:"#fff", borderRadius:"50%", width:21, height:21,
-          fontSize:11, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold" }}>
+    <div style={{ height:"100vh", display:"flex", flexDirection:"column",
+      background:"#12121c", fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif", color:"#fff",
+      overflow:"hidden" }}>
+
+      {/* Header */}
+      <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px 8px",
+        borderBottom:"1px solid #2a2a3a", flexShrink:0, background:"#12121c", zIndex:20 }}>
+        <span style={{ fontSize:19 }}>🌾</span>
+        <span style={{ fontWeight:"bold", fontSize:15 }}>圃場 ToDo</span>
+        <span style={{ background:"#e53e3e", color:"#fff", borderRadius:"50%", width:19, height:19,
+          fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold" }}>
           {total}
         </span>
         <div style={{ flex:1 }} />
-        <button style={{ background:"#2a2a3a", border:"none", borderRadius:7,
-          color:"#aaa", padding:"5px 10px", fontSize:11, cursor:"pointer" }}>完了▼</button>
-        <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:7,
-          color:"#aaa", padding:"5px 10px", fontSize:11, cursor:"pointer" }}>＋地区</button>
+        <button style={{ background:"#2a2a3a", border:"none", borderRadius:6,
+          color:"#aaa", padding:"4px 9px", fontSize:10, cursor:"pointer" }}>完了▼</button>
+        <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
+          color:"#aaa", padding:"4px 9px", fontSize:10, cursor:"pointer" }}>＋地区</button>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
+          background:"#222", border:"1px solid #e53e3e", borderRadius:12,
+          padding:"14px 20px", zIndex:200, color:"#fff", fontSize:13,
+          textAlign:"center", boxShadow:"0 4px 20px rgba(0,0,0,0.8)"
+        }}>
+          ⚠️ これ以上は一杯なため<br />追加できません
+        </div>
+      )}
+
+      {/* Modal */}
       {modal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)",
           zIndex:100, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -252,12 +304,28 @@ function App() {
           </div>
         </div>
       )}
-      <div style={{ columnCount:2, columnGap:10, columnRuleWidth:"2px",
-        columnRuleStyle:"dashed", columnRuleColor:"#2e2e44", padding:10 }}>
+
+      {/* ★ 2列 固定高さ — 左列が埋まったら右列へ自動折り返し */}
+      <div ref={colRef} style={{
+        flex:1,
+        columnCount: 2,
+        columnGap: 8,
+        columnRuleWidth: "2px",
+        columnRuleStyle: "dashed",
+        columnRuleColor: "#2e2e44",
+        padding: 8,
+        overflow: "hidden",  // はみ出し非表示
+        alignContent: "start",
+      }}>
         {areas.map(area => (
-          <div key={area.id} style={{ breakInside:"avoid", WebkitColumnBreakInside:"avoid",
-            display:"inline-block", width:"100%", boxSizing:"border-box", marginBottom:10 }}>
-            <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} />
+          <div key={area.id} style={{
+            breakInside: "avoid",
+            WebkitColumnBreakInside: "avoid",
+            display: "inline-block",
+            width: "100%",
+            boxSizing: "border-box",
+          }}>
+            <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} onAddTask={addTask} />
           </div>
         ))}
       </div>
