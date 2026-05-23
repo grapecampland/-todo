@@ -357,9 +357,6 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   return (
     <div style={{ background: area.color+"bb", borderRadius:10, padding:8, border:`1px solid ${area.color}99` }}>
       <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
-        <span onClick={nameClick} style={{ fontSize:18, lineHeight:1, cursor:"pointer" }}>
-          {area.emoji}
-        </span>
         <span
           onClick={nameClick}
           onTouchStart={nameTouchStart}
@@ -375,6 +372,13 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
+        {/* 圃場が1つ(name=null)のときはここに直接タスク追加ボタンも並べる */}
+        {area.groups.length === 1 && area.groups[0].name === null && (
+          <button onClick={() => onAddTask(area.id, area.groups[0].id)}
+            style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
+              cursor:"pointer", width:18, height:18, fontSize:11, display:"flex",
+              alignItems:"center", justifyContent:"center" }}>＋</button>
+        )}
         <button onClick={e => { e.stopPropagation(); addGroup(); }}
           style={{ background:"rgba(255,255,255,0.12)", border:"none", borderRadius:4, color:"#fff",
             cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
