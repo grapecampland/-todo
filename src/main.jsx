@@ -369,17 +369,17 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
-        {/* 圃場が1つ(name=null)のときはここに直接タスク追加ボタンも並べる */}
-        {area.groups.length === 1 && area.groups[0].name === null && (
-          <button onClick={() => onAddTask(area.id, area.groups[0].id)}
-            style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
-              cursor:"pointer", width:18, height:18, fontSize:11, display:"flex",
-              alignItems:"center", justifyContent:"center" }}>＋</button>
-        )}
-        <button onClick={e => { e.stopPropagation(); addGroup(); }}
-          style={{ background:"rgba(255,255,255,0.12)", border:"none", borderRadius:4, color:"#fff",
-            cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
-            alignItems:"center", justifyContent:"center" }}>+</button>
+        {/* 圃場が1つ(名前なし)→タスク追加、複数→圃場追加 */}
+        <button onClick={e => {
+          e.stopPropagation();
+          if (area.groups.length === 1 && area.groups[0].name === null) {
+            onAddTask(area.id, area.groups[0].id);
+          } else {
+            addGroup();
+          }
+        }} style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
+          cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
+          alignItems:"center", justifyContent:"center" }}>+</button>
       </div>
 
       {area.groups.map(g => (
@@ -465,24 +465,53 @@ function App() {
 
   const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
+  const [yearGoal, setYearGoal] = useState("年間目標を入力…");
+  const [todayGoal, setTodayGoal] = useState("今日の目標を入力…");
+  const [editYear, setEditYear] = useState(false);
+  const [editToday, setEditToday] = useState(false);
+
   return (
     <div style={{ height:"100vh", display:"flex", flexDirection:"column",
       background:"#12121c", fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",
       color:"#fff", overflow:"hidden" }}>
 
-      <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px 8px",
-        borderBottom:"1px solid #2a2a3a", flexShrink:0 }}>
-        <span style={{ fontSize:19 }}>🌾</span>
-        <span style={{ fontWeight:"bold", fontSize:15 }}>圃場 ToDo</span>
-        <span style={{ background:"#e53e3e", color:"#fff", borderRadius:"50%", width:19, height:19,
-          fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold" }}>
-          {total}
-        </span>
-        <div style={{ flex:1 }} />
-        <button style={{ background:"#2a2a3a", border:"none", borderRadius:6,
-          color:"#aaa", padding:"4px 9px", fontSize:10, cursor:"pointer" }}>完了▼</button>
-        <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
-          color:"#aaa", padding:"4px 9px", fontSize:10, cursor:"pointer" }}>＋地区</button>
+      <div style={{ padding:"8px 12px 6px", borderBottom:"1px solid #2a2a3a", flexShrink:0 }}>
+        {/* 1行目：年間目標 + バッジ + ボタン */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+          {editYear
+            ? <input autoFocus value={yearGoal} onChange={e => setYearGoal(e.target.value)}
+                onBlur={() => setEditYear(false)}
+                onKeyDown={e => e.key==="Enter" && setEditYear(false)}
+                style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
+                  color:"#fff", fontSize:14, fontWeight:"bold", outline:"none" }} />
+            : <span onClick={() => setEditYear(true)}
+                style={{ flex:1, fontWeight:"bold", fontSize:14, color:"#fff", cursor:"text",
+                  opacity: yearGoal==="年間目標を入力…" ? 0.35 : 1 }}>
+                {yearGoal}
+              </span>
+          }
+          <span style={{ background:"#e53e3e", color:"#fff", borderRadius:"50%", width:18, height:18,
+            fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold", flexShrink:0 }}>
+            {total}
+          </span>
+          <button style={{ background:"#2a2a3a", border:"none", borderRadius:6,
+            color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>完了▼</button>
+          <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
+            color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>＋地区</button>
+        </div>
+        {/* 2行目：今日の目標 */}
+        {editToday
+          ? <input autoFocus value={todayGoal} onChange={e => setTodayGoal(e.target.value)}
+              onBlur={() => setEditToday(false)}
+              onKeyDown={e => e.key==="Enter" && setEditToday(false)}
+              style={{ width:"100%", background:"transparent", border:"none", borderBottom:"1px solid #555",
+                color:"#aaa", fontSize:11, outline:"none", boxSizing:"border-box" }} />
+          : <span onClick={() => setEditToday(true)}
+              style={{ fontSize:11, color:"#888", cursor:"text",
+                opacity: todayGoal==="今日の目標を入力…" ? 0.5 : 1 }}>
+              📍 {todayGoal}
+            </span>
+        }
       </div>
 
       {toast && (
