@@ -88,8 +88,7 @@ function EmojiPicker({ current, onSelect, onClose }) {
       {EMOJI_LIST.map(e => (
         <button key={e} onClick={() => { onSelect(e); onClose(); }} style={{
           background: e === current ? "#444" : "transparent",
-          border: "none", borderRadius: 5, fontSize: 16, cursor: "pointer",
-          padding: "2px", lineHeight: 1.4,
+          border: "none", borderRadius: 5, fontSize: 16, cursor: "pointer", padding: "2px", lineHeight: 1.4,
         }}>{e}</button>
       ))}
     </div>
@@ -123,8 +122,7 @@ function TaskItem({ task, onToggle, onDelete, onPriorityChange, onTextChange }) 
             flex: 1, background: "transparent", border: "none",
             borderBottom: "1px solid #aaa", color: "#fff",
             fontSize: 12, outline: "none", padding: "1px 0"
-          }}
-        />
+          }} />
       ) : (
         <span onClick={() => setEditing(true)} style={{
           flex: 1, fontSize: 12, color: task.done ? "#555" : "#ddd",
@@ -137,8 +135,7 @@ function TaskItem({ task, onToggle, onDelete, onPriorityChange, onTextChange }) 
         onPriorityChange(priorities[(idx + 1) % priorities.length]);
       }} style={{
         fontSize: 10, fontWeight: "bold", color: cfg.color,
-        background: "transparent", border: "none", cursor: "pointer",
-        padding: "1px 3px", flexShrink: 0
+        background: "transparent", border: "none", cursor: "pointer", padding: "1px 3px", flexShrink: 0
       }}>{cfg.label}</button>
       <button onClick={onDelete} style={{
         color: "#555", background: "transparent", border: "none",
@@ -149,29 +146,19 @@ function TaskItem({ task, onToggle, onDelete, onPriorityChange, onTextChange }) 
 }
 
 function GroupSection({ group, onTasksChange }) {
-  const addTask = () => {
-    onTasksChange([...group.tasks, { id: uid(), text: "新タスク", priority: "中", done: false }]);
-  };
-  const updateTask = (id, patch) => {
-    onTasksChange(group.tasks.map(t => t.id === id ? { ...t, ...patch } : t));
-  };
-  const deleteTask = (id) => {
-    onTasksChange(group.tasks.filter(t => t.id !== id));
-  };
+  const addTask = () => onTasksChange([...group.tasks, { id: uid(), text: "新タスク", priority: "中", done: false }]);
+  const updateTask = (id, patch) => onTasksChange(group.tasks.map(t => t.id === id ? { ...t, ...patch } : t));
+  const deleteTask = (id) => onTasksChange(group.tasks.filter(t => t.id !== id));
 
   return (
     <div style={{ marginBottom: 6 }}>
       {group.name && (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          marginBottom: 5, padding: "3px 2px"
-        }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5, padding: "3px 2px" }}>
           <span style={{ fontSize: 11, fontWeight: "bold", color: "#bbb" }}>{group.name}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <span style={{
               background: "#444", color: "#fff", borderRadius: "50%",
-              width: 17, height: 17, fontSize: 10, display: "flex",
-              alignItems: "center", justifyContent: "center"
+              width: 17, height: 17, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center"
             }}>{group.tasks.filter(t => !t.done).length}</span>
             <button onClick={addTask} style={{
               background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 4,
@@ -186,8 +173,7 @@ function GroupSection({ group, onTasksChange }) {
           onToggle={() => updateTask(task.id, { done: !task.done })}
           onDelete={() => deleteTask(task.id)}
           onPriorityChange={p => updateTask(task.id, { priority: p })}
-          onTextChange={t => updateTask(task.id, { text: t })}
-        />
+          onTextChange={t => updateTask(task.id, { text: t })} />
       ))}
       {!group.name && (
         <button onClick={addTask} style={{
@@ -204,31 +190,29 @@ function AreaCard({ area, onUpdate, onDelete }) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [editName, setEditName] = useState(false);
   const [nameVal, setNameVal] = useState(area.name);
-  const emojiRef = useRef();
 
   const totalTasks = area.groups.reduce((s, g) => s + g.tasks.filter(t => !t.done).length, 0);
-
-  const updateGroup = (gid, tasks) => {
-    onUpdate({ ...area, groups: area.groups.map(g => g.id === gid ? { ...g, tasks } : g) });
-  };
-  const addGroup = () => {
-    onUpdate({ ...area, groups: [...area.groups, { id: uid(), name: `圃場${area.groups.length + 1}`, tasks: [] }] });
-  };
+  const updateGroup = (gid, tasks) => onUpdate({ ...area, groups: area.groups.map(g => g.id === gid ? { ...g, tasks } : g) });
+  const addGroup = () => onUpdate({ ...area, groups: [...area.groups, { id: uid(), name: `圃場${area.groups.length + 1}`, tasks: [] }] });
 
   return (
-    // breakInside: avoid が大事 — カード途中で列を跨がない
     <div style={{
       background: area.color + "cc",
-      borderRadius: 12, padding: 10, marginBottom: 10,
+      borderRadius: 12, padding: 10,
       border: `1px solid ${area.color}88`,
+      // CSS columns で使うキーワード — カード単位でキレイに折り返す
       breakInside: "avoid",
+      WebkitColumnBreakInside: "avoid",
+      pageBreakInside: "avoid",
+      display: "inline-block",
+      width: "100%",
+      boxSizing: "border-box",
+      marginBottom: 10,
     }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <div style={{ position: "relative" }} ref={emojiRef}>
+        <div style={{ position: "relative" }}>
           <button onClick={() => setShowEmoji(v => !v)} style={{
-            background: "transparent", border: "none",
-            fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0
+            background: "transparent", border: "none", fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 0
           }}>{area.emoji}</button>
           {showEmoji && (
             <EmojiPicker current={area.emoji}
@@ -242,20 +226,17 @@ function AreaCard({ area, onUpdate, onDelete }) {
             onBlur={() => { onUpdate({ ...area, name: nameVal }); setEditName(false); }}
             onKeyDown={e => e.key === "Enter" && e.target.blur()}
             style={{
-              background: "transparent", border: "none",
-              borderBottom: "1px solid #fff", color: "#fff",
-              fontSize: 13, fontWeight: "bold", outline: "none", flex: 1
-            }}
-          />
+              background: "transparent", border: "none", borderBottom: "1px solid #fff",
+              color: "#fff", fontSize: 13, fontWeight: "bold", outline: "none", flex: 1
+            }} />
         ) : (
           <span onClick={() => setEditName(true)} style={{
             flex: 1, fontWeight: "bold", fontSize: 13, color: "#fff", cursor: "text"
           }}>{area.name}</span>
         )}
         <span style={{
-          background: "#55558888", color: "#fff", borderRadius: "50%",
-          width: 18, height: 18, fontSize: 10, display: "flex",
-          alignItems: "center", justifyContent: "center", flexShrink: 0
+          background: "#55555588", color: "#fff", borderRadius: "50%",
+          width: 18, height: 18, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
         }}>{totalTasks}</span>
         <button onClick={addGroup} style={{
           background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 5,
@@ -266,8 +247,6 @@ function AreaCard({ area, onUpdate, onDelete }) {
           background: "transparent", border: "none", color: "#aaa", cursor: "pointer", fontSize: 13
         }}>…</button>
       </div>
-
-      {/* Groups */}
       {area.groups.map(g => (
         <GroupSection key={g.id} group={g} onTasksChange={tasks => updateGroup(g.id, tasks)} />
       ))}
@@ -305,73 +284,35 @@ export default function App() {
   const totalIncomplete = areas.reduce((s, a) =>
     s + a.groups.reduce((gs, g) => gs + g.tasks.filter(t => !t.done).length, 0), 0);
 
+  // 列をまたいで切れた境界に点線を表示するためのセパレータ
+  const ColBreakLine = () => (
+    <div style={{
+      breakAfter: "column",
+      WebkitColumnBreakAfter: "column",
+      // 点線インジケーター
+      borderBottom: "2px dashed #2e2e44",
+      marginBottom: 8,
+      position: "relative",
+    }}>
+      <span style={{
+        position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)",
+        background: "#12121c", color: "#444", fontSize: 9, padding: "0 4px", whiteSpace: "nowrap"
+      }}>続き ↓ ｜ ↑ 続き</span>
+    </div>
+  );
+
   return (
     <div style={{
       minHeight: "100vh", background: "#12121c",
       fontFamily: "'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif",
       color: "#fff",
     }}>
-      {/* Global CSS for column break indicators */}
-      <style>{`
-        .card-column {
-          columns: 2;
-          column-gap: 10px;
-          padding: 10px;
-          column-rule: 2px dashed #2a2a3a;
-        }
-        /* カードが列をまたいで切れた上端に点線 */
-        .area-card-wrap {
-          display: inline-block;
-          width: 100%;
-          break-inside: avoid;
-          margin-bottom: 10px;
-        }
-        /* 列の区切り線の上下に点線バッジ */
-        .col-break-top {
-          border-top: 2px dashed #3a3a55;
-          margin-bottom: 6px;
-          position: relative;
-        }
-        .col-break-top::before {
-          content: "↑ 続き";
-          position: absolute;
-          top: -9px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: #12121c;
-          color: #555;
-          font-size: 9px;
-          padding: 0 4px;
-          white-space: nowrap;
-        }
-        .col-break-bottom {
-          border-bottom: 2px dashed #3a3a55;
-          margin-top: 6px;
-          position: relative;
-        }
-        .col-break-bottom::after {
-          content: "続き ↓";
-          position: absolute;
-          bottom: -9px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: #12121c;
-          color: #555;
-          font-size: 9px;
-          padding: 0 4px;
-          white-space: nowrap;
-        }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-      `}</style>
-
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "14px 16px 10px",
-        background: "#12121c", position: "sticky", top: 0, zIndex: 20,
-        borderBottom: "1px solid #2a2a3a"
+        borderBottom: "1px solid #2a2a3a",
+        position: "sticky", top: 0, background: "#12121c", zIndex: 20,
       }}>
         <span style={{ fontSize: 22 }}>🌾</span>
         <span style={{ fontWeight: "bold", fontSize: 17 }}>圃場 ToDo</span>
@@ -398,8 +339,7 @@ export default function App() {
           zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center"
         }}>
           <div style={{
-            background: "#1e1e30", borderRadius: 16, padding: 20, width: 300,
-            border: "1px solid #444"
+            background: "#1e1e30", borderRadius: 16, padding: 20, width: 300, border: "1px solid #444"
           }}>
             <div style={{ fontWeight: "bold", marginBottom: 14, fontSize: 15 }}>新しい地区を追加</div>
             <div style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "center" }}>
@@ -436,10 +376,25 @@ export default function App() {
         </div>
       )}
 
-      {/* ★ CSS columns layout — 左列が埋まったら自動で右列に流れる */}
-      <div className="card-column">
+      {/* ★ CSS columns — 左列が埋まったら右列に自動で流れる */}
+      <div style={{
+        columnCount: 2,
+        columnGap: 10,
+        columnRuleWidth: 2,
+        columnRuleStyle: "dashed",
+        columnRuleColor: "#2a2a3a",
+        padding: 10,
+      }}>
         {areas.map(area => (
-          <div key={area.id} className="area-card-wrap">
+          <div key={area.id} style={{
+            breakInside: "avoid",
+            WebkitColumnBreakInside: "avoid",
+            pageBreakInside: "avoid",
+            display: "inline-block",
+            width: "100%",
+            boxSizing: "border-box",
+            marginBottom: 10,
+          }}>
             <AreaCard area={area} onUpdate={updateArea} onDelete={() => deleteArea(area.id)} />
           </div>
         ))}
