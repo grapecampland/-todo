@@ -118,7 +118,7 @@ function Task({ task, onChange, onDelete }) {
   );
 }
 
-function Group({ group, onChange, onAddTask, full }) {
+function Group({ group, onChange, onAddTask }) {
   const upd = (t) => onChange({ ...group, tasks: group.tasks.map(x => x.id===t.id ? t : x) });
   const del = (id) => onChange({ ...group, tasks: group.tasks.filter(x => x.id!==id) });
   return (
@@ -153,10 +153,15 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   const [nameVal, setNameVal] = useState(area.name);
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
   const updGroup = (g) => onUpdate({ ...area, groups: area.groups.map(x => x.id===g.id ? g : x) });
+  const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
+    { id:nid(), name:`グループ${area.groups.length+1}`, tasks:[] }] });
   return (
     <div style={{
-      background: area.color+"bb", borderRadius:10, padding:8,
-      border:`1px solid ${area.color}77`, marginBottom:6,
+      background: area.color+"bb",
+      borderRadius:10, padding:8,
+      border:`1px solid ${area.color}99`,
+      marginBottom:6,
+      position:"relative",
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
         <EmojiPicker value={area.emoji} onChange={e => onUpdate({ ...area, emoji:e })} />
@@ -175,16 +180,18 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
+        <button onClick={addGroup}
+          style={{ background:"rgba(255,255,255,0.12)", border:"none", borderRadius:4, color:"#fff",
+            cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
+            alignItems:"center", justifyContent:"center" }}>+</button>
         <button onClick={onDelete}
           style={{ background:"transparent", border:"none", color:"#aaa", cursor:"pointer", fontSize:12 }}>
           …
         </button>
       </div>
       {area.groups.map(g => (
-        <Group key={g.id} group={g}
-          onChange={updGroup}
-          onAddTask={() => onAddTask(area.id, g.id)}
-        />
+        <Group key={g.id} group={g} onChange={updGroup}
+          onAddTask={() => onAddTask(area.id, g.id)} />
       ))}
     </div>
   );
@@ -196,8 +203,6 @@ function App() {
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
   const [toast, setToast] = useState(false);
-
-  // 2列コンテナのref — 高さを測って満杯かチェック
   const colRef = useRef();
 
   const upd = (a) => setAreas(prev => prev.map(x => x.id===a.id ? a : x));
@@ -206,25 +211,18 @@ function App() {
   const isFull = () => {
     const el = colRef.current;
     if (!el) return false;
-    // scrollHeight > clientHeight なら溢れてる
     return el.scrollHeight > el.clientHeight + 4;
   };
 
   const addTask = (areaId, groupId) => {
-    // 一時的に追加してみて溢れたら取り消す
     const newTask = { id: nid(), text: "新タスク", pri: "中", done: false };
-    setAreas(prev => {
-      const next = prev.map(a => a.id !== areaId ? a : {
-        ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
-          ...g, tasks: [...g.tasks, newTask]
-        })
-      });
-      return next;
-    });
-    // 次のフレームで溢れチェック
+    setAreas(prev => prev.map(a => a.id !== areaId ? a : {
+      ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
+        ...g, tasks: [...g.tasks, newTask]
+      })
+    }));
     setTimeout(() => {
       if (isFull()) {
-        // 取り消し
         setAreas(prev => prev.map(a => a.id !== areaId ? a : {
           ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
             ...g, tasks: g.tasks.filter(t => t.id !== newTask.id)
@@ -251,12 +249,12 @@ function App() {
 
   return (
     <div style={{ height:"100vh", display:"flex", flexDirection:"column",
-      background:"#12121c", fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif", color:"#fff",
-      overflow:"hidden" }}>
+      background:"#12121c", fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",
+      color:"#fff", overflow:"hidden" }}>
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px 8px",
-        borderBottom:"1px solid #2a2a3a", flexShrink:0, background:"#12121c", zIndex:20 }}>
+        borderBottom:"1px solid #2a2a3a", flexShrink:0 }}>
         <span style={{ fontSize:19 }}>🌾</span>
         <span style={{ fontWeight:"bold", fontSize:15 }}>圃場 ToDo</span>
         <span style={{ background:"#e53e3e", color:"#fff", borderRadius:"50%", width:19, height:19,
@@ -274,9 +272,9 @@ function App() {
       {toast && (
         <div style={{
           position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
-          background:"#222", border:"1px solid #e53e3e", borderRadius:12,
+          background:"#1e1e1e", border:"1px solid #e53e3e", borderRadius:12,
           padding:"14px 20px", zIndex:200, color:"#fff", fontSize:13,
-          textAlign:"center", boxShadow:"0 4px 20px rgba(0,0,0,0.8)"
+          textAlign:"center", boxShadow:"0 4px 20px rgba(0,0,0,0.9)"
         }}>
           ⚠️ これ以上は一杯なため<br />追加できません
         </div>
@@ -305,29 +303,45 @@ function App() {
         </div>
       )}
 
-      {/* ★ 2列 固定高さ — 左列が埋まったら右列へ自動折り返し */}
-      <div ref={colRef} style={{
-        flex:1,
-        columnCount: 2,
-        columnGap: 8,
-        columnRuleWidth: "2px",
-        columnRuleStyle: "dashed",
-        columnRuleColor: "#2e2e44",
-        padding: 8,
-        overflow: "hidden",  // はみ出し非表示
-        alignContent: "start",
-      }}>
-        {areas.map(area => (
-          <div key={area.id} style={{
-            breakInside: "avoid",
-            WebkitColumnBreakInside: "avoid",
-            display: "inline-block",
-            width: "100%",
-            boxSizing: "border-box",
-          }}>
-            <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} onAddTask={addTask} />
-          </div>
-        ))}
+      {/* 列の折り返し表示 — 左下端→右上へのグラデ点線 */}
+      <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
+
+        {/* 左列下端グラデーション（折り返しを示す） */}
+        <div style={{
+          position:"absolute", bottom:0, left:0,
+          width:"calc(50% - 4px)", height:40,
+          background:"linear-gradient(to bottom, transparent, rgba(100,80,200,0.25))",
+          borderBottom:"2px dashed #5a4a9a",
+          zIndex:10, pointerEvents:"none",
+          borderRadius:"0 0 0 0",
+        }} />
+        {/* 右列上端グラデーション（折り返しの続きを示す） */}
+        <div style={{
+          position:"absolute", top:0, right:0,
+          width:"calc(50% - 4px)", height:40,
+          background:"linear-gradient(to top, transparent, rgba(100,80,200,0.25))",
+          borderTop:"2px dashed #5a4a9a",
+          zIndex:10, pointerEvents:"none",
+        }} />
+
+        {/* CSS columns 本体 — breakInside なし → カードが途中で切れてOK */}
+        <div ref={colRef} style={{
+          height:"100%",
+          columnCount: 2,
+          columnGap: 8,
+          columnRuleWidth: "2px",
+          columnRuleStyle: "dashed",
+          columnRuleColor: "#3a3a5a",
+          padding: 8,
+          overflow:"hidden",
+          boxSizing:"border-box",
+        }}>
+          {areas.map(area => (
+            <div key={area.id} style={{ marginBottom:0, width:"100%" }}>
+              <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} onAddTask={addTask} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
