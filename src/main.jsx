@@ -256,28 +256,25 @@ function Group({ group, onChange, onAddTask, onDelete }) {
 
   return (
     <div style={{ marginBottom:4 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
-        {group.name
-          ? <span
-              {...lp}
-              onTouchStart={(e) => { lp.onTouchStart(e); }}
-              style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"context-menu", userSelect:"none", flex:1 }}>
-              {group.name}
-            </span>
-          : <span style={{ flex:1 }} />
-        }
-        <div style={{ display:"flex", gap:3, alignItems:"center" }}>
-          {group.name && (
+      {group.name && (
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
+          <span
+            {...lp}
+            onTouchStart={(e) => { lp.onTouchStart(e); }}
+            style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"context-menu", userSelect:"none", flex:1 }}>
+            {group.name}
+          </span>
+          <div style={{ display:"flex", gap:3, alignItems:"center" }}>
             <span style={{ background:"#444", color:"#fff", borderRadius:"50%", width:14, height:14,
               fontSize:9, display:"flex", alignItems:"center", justifyContent:"center" }}>
               {group.tasks.filter(t => !t.done).length}
             </span>
-          )}
-          <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
-            borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
-            display:"flex", alignItems:"center", justifyContent:"center" }}>➕</button>
+            <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
+              borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
+              display:"flex", alignItems:"center", justifyContent:"center" }}>＋</button>
+          </div>
         </div>
-      </div>
+      )}
       {group.tasks.map((t, i) => (
         <Task key={t.id} task={t}
           onChange={updTask}
