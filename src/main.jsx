@@ -154,14 +154,12 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
   const updGroup = (g) => onUpdate({ ...area, groups: area.groups.map(x => x.id===g.id ? g : x) });
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
-    { id:nid(), name:`グループ${area.groups.length+1}`, tasks:[] }] });
+    { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
   return (
     <div style={{
       background: area.color+"bb",
       borderRadius:10, padding:8,
       border:`1px solid ${area.color}99`,
-      marginBottom:6,
-      position:"relative",
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
         <EmojiPicker value={area.emoji} onChange={e => onUpdate({ ...area, emoji:e })} />
@@ -247,6 +245,10 @@ function App() {
 
   const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
+  // カラムの高さ = ビューポート高さ - ヘッダー高さ
+  // columnFill: "auto" が超重要 — "balance"(デフォ)だと均等に分けようとして
+  // 左列が半分で折り返してしまう。"auto"にすると左列を満杯にしてから右列へ。
+
   return (
     <div style={{ height:"100vh", display:"flex", flexDirection:"column",
       background:"#12121c", fontFamily:"'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif",
@@ -268,7 +270,6 @@ function App() {
           color:"#aaa", padding:"4px 9px", fontSize:10, cursor:"pointer" }}>＋地区</button>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div style={{
           position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
@@ -280,7 +281,6 @@ function App() {
         </div>
       )}
 
-      {/* Modal */}
       {modal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)",
           zIndex:100, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -303,32 +303,30 @@ function App() {
         </div>
       )}
 
-      {/* 列の折り返し表示 — 左下端→右上へのグラデ点線 */}
+      {/* ★ columnFill:"auto" が鍵 — 左列満杯→右列の順に流れる */}
       <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
-
-        {/* 左列下端グラデーション（折り返しを示す） */}
+        {/* 折り返し目印：左列下端の点線グラデ */}
         <div style={{
           position:"absolute", bottom:0, left:0,
-          width:"calc(50% - 4px)", height:40,
-          background:"linear-gradient(to bottom, transparent, rgba(100,80,200,0.25))",
+          width:"calc(50% - 4px)", height:36,
+          background:"linear-gradient(to bottom, transparent, rgba(80,60,160,0.3))",
           borderBottom:"2px dashed #5a4a9a",
-          zIndex:10, pointerEvents:"none",
-          borderRadius:"0 0 0 0",
+          zIndex:5, pointerEvents:"none",
         }} />
-        {/* 右列上端グラデーション（折り返しの続きを示す） */}
+        {/* 折り返し目印：右列上端の点線グラデ */}
         <div style={{
           position:"absolute", top:0, right:0,
-          width:"calc(50% - 4px)", height:40,
-          background:"linear-gradient(to top, transparent, rgba(100,80,200,0.25))",
+          width:"calc(50% - 4px)", height:36,
+          background:"linear-gradient(to top, transparent, rgba(80,60,160,0.3))",
           borderTop:"2px dashed #5a4a9a",
-          zIndex:10, pointerEvents:"none",
+          zIndex:5, pointerEvents:"none",
         }} />
 
-        {/* CSS columns 本体 — breakInside なし → カードが途中で切れてOK */}
         <div ref={colRef} style={{
           height:"100%",
           columnCount: 2,
           columnGap: 8,
+          columnFill: "auto",        // ← これが超重要！左列満杯にしてから右列へ
           columnRuleWidth: "2px",
           columnRuleStyle: "dashed",
           columnRuleColor: "#3a3a5a",
@@ -336,8 +334,11 @@ function App() {
           overflow:"hidden",
           boxSizing:"border-box",
         }}>
-          {areas.map(area => (
-            <div key={area.id} style={{ marginBottom:0, width:"100%" }}>
+          {areas.map((area, i) => (
+            <div key={area.id} style={{
+              marginBottom: i < areas.length - 1 ? 6 : 0,
+              width:"100%",
+            }}>
               <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} onAddTask={addTask} />
             </div>
           ))}
