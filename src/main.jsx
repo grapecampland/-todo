@@ -1,28 +1,22 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
 const PRIORITIES = ["急", "中", "低"];
 const P_COLOR = { 急: "#ef4444", 中: "#f97316", 低: "#22c55e" };
 
-// 全絵文字カテゴリ
 const EMOJIS = [
-  "😀","😁","😂","🤣","😃","😄","😅","😆","😇","😈","👿","😉","😊","😋","😌","😍","🥰","😎","😏","😐",
-  "😑","😒","😓","😔","😕","😖","😗","😘","😙","😚","😛","😜","😝","😞","😟","😠","😡","😢","😣","😤",
-  "😥","😦","😧","😨","😩","😪","😫","😬","😭","😮","😯","😰","😱","😲","😳","😴","😵","😶","😷","🤒",
-  "🤔","🤗","🤠","🤡","🤢","🤣","🤤","🤥","🤧","🤨","🤩","🤪","🤫","🤬","🤭","🤮","🤯","🥱","🥲","🥳",
-  "👋","🤚","🖐","✋","🖖","👌","🤌","🤏","✌","🤞","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝","👍",
-  "👎","✊","👊","🤛","🤜","👏","🙌","👐","🤲","🤝","🙏","✍","💅","🤳","💪","🦾","🦿","🦵","🦶","👂",
-  "🌾","🍇","🫛","🌽","🍅","🥬","🥕","🍓","🍈","🍑","🍒","🥦","🌿","🌱","🪴","🌳","🌲","🌵","🎋","🎍",
-  "🦆","🐓","🐄","🐖","🐑","🐇","🦌","🐗","🐝","🦋","🐛","🐌","🐞","🦗","🐜","🐢","🐍","🦎","🐠","🐟",
-  "🏔","⛰","🌋","🗻","🏕","🌊","🏞","🌄","🌅","🌠","⭐","🌟","✨","☀","🌙","🌈","⛅","🌧","❄","🌬",
-  "🚜","⛏","🪚","🔨","🪣","💧","🌡","🧪","📋","📊","📈","🗓","⏰","🔔","📍","🗂","📦","🏠","🏡","🏘",
-  "🍷","🍶","🧃","☕","🍵","🥂","🍺","🍻","🎵","🎷","🎸","🎹","🎺","🎻","🥁","🎤","🎧","🎼","🎭","🎨",
-  "❤","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","💕","💞","💓","💗","💖","💘","💝","✅","🔥","⚡",
-  "🌸","🌺","🌻","🌹","🌷","💐","🪷","🌼","🌞","🎃","🎄","🎆","🎇","🎑","🎗","🎀","🎁","🏆","🥇","🎖",
-  "🐉","🦁","🐯","🦊","🐺","🐻","🐼","🦝","🐨","🦘","🦙","🦒","🐘","🦏","🦛","🐃","🐂","🐎","🦄","🐉",
+  "🌾","🍇","🫛","🌽","🍅","🥬","🥕","🍓","🍒","🥦","🌿","🌱","🪴","🌳","🌲","🌵","🎋","🎍",
+  "🦆","🐓","🐄","🐖","🐑","🐇","🦌","🐗","🐝","🦋","🐛","🐌","🐞","🐜","🐢","🐍","🦎","🐠",
+  "🏔","⛰","🌋","🌊","🌄","🌅","⭐","🌟","✨","☀","🌙","🌈","⛅","🌧","❄","🌬",
+  "🚜","⛏","🪚","🔨","🪣","💧","📋","📊","🗓","⏰","🔔","📍","📦","🏠","🏡",
+  "🍷","🍶","☕","🍵","🥂","🍺","🎵","🎷","🎸","🎹","🎤","🎧","🎨","🎭",
+  "❤","🧡","💛","💚","💙","💜","🖤","🤍","✅","🔥","⚡","💎","🏆","🥇",
+  "🌸","🌺","🌻","🌹","🌷","💐","🪷","🌼","🌞","🎃","🎄","🎁","🎀","🎗",
+  "🐉","🦁","🐯","🦊","🐺","🐻","🐼","🦝","🐨","🦒","🐘","🦏","🐂","🐎","🦄",
+  "😀","😎","🤩","😍","🥰","😇","🤔","💪","🙌","👍","✌","🤝","🙏","👋",
 ];
 
-const COLORS = [
+const CARD_COLORS = [
   "#5b3d8f","#7c5c1e","#1e4a6e","#7c1e5c",
   "#3d6e1e","#6e1e1e","#1e6e6e","#4a4a8f",
   "#8f5b3d","#3d8f5b","#8f3d5b","#5b8f3d",
@@ -68,230 +62,204 @@ const INIT = [
   ]},
 ];
 
-const sortTasks = (tasks) => {
+const sortByPri = (tasks) => {
   const order = { 急:0, 中:1, 低:2 };
   return [...tasks].sort((a,b) => order[a.pri] - order[b.pri]);
 };
 
-// ===== 絵文字ピッカー =====
-function EmojiPicker({ value, onChange, onClose }) {
-  const ref = useRef();
-  const [search, setSearch] = useState("");
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
-  const filtered = search ? EMOJIS.filter(e => e.includes(search)) : EMOJIS;
+// 長押し検出フック
+function useLongPress(callback, ms=500) {
+  const timer = useRef(null);
+  const start = (e) => {
+    e.preventDefault();
+    timer.current = setTimeout(callback, ms);
+  };
+  const cancel = () => clearTimeout(timer.current);
+  return { onTouchStart:start, onTouchEnd:cancel, onTouchMove:cancel, onMouseDown:start, onMouseUp:cancel, onMouseLeave:cancel };
+}
+
+// コンテキストメニュー（編集/削除）
+function ContextMenu({ x, y, onEdit, onDelete, onClose }) {
   return (
-    <div ref={ref} style={{
-      position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
-      zIndex:2000, background:"#1a1a2e", border:"1px solid #555", borderRadius:14,
-      padding:12, width:280, boxShadow:"0 8px 32px rgba(0,0,0,0.9)"
-    }}>
-      <div style={{ fontWeight:"bold", color:"#fff", marginBottom:8, fontSize:13 }}>絵文字を選択</div>
+    <>
+      <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:900 }} />
       <div style={{
-        display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:4,
-        maxHeight:220, overflowY:"auto"
+        position:"fixed", left:x, top:y, zIndex:1000,
+        background:"#2a2a3a", border:"1px solid #555", borderRadius:10,
+        overflow:"hidden", boxShadow:"0 4px 20px rgba(0,0,0,0.8)", minWidth:120,
       }}>
-        {filtered.map((e,i) => (
-          <button key={i} onClick={() => { onChange(e); onClose(); }}
-            style={{ background: e===value?"#444":"transparent", border:"none", borderRadius:6,
-              fontSize:20, cursor:"pointer", padding:3, lineHeight:1.3 }}>
-            {e}
-          </button>
-        ))}
+        <button onClick={() => { onEdit(); onClose(); }} style={{
+          display:"block", width:"100%", padding:"11px 16px", background:"transparent",
+          border:"none", color:"#fff", cursor:"pointer", textAlign:"left", fontSize:13,
+          borderBottom:"1px solid #3a3a4a"
+        }}>✏️ 編集</button>
+        <button onClick={() => { onDelete(); onClose(); }} style={{
+          display:"block", width:"100%", padding:"11px 16px", background:"transparent",
+          border:"none", color:"#ef4444", cursor:"pointer", textAlign:"left", fontSize:13,
+        }}>🗑️ 削除</button>
       </div>
-      <button onClick={onClose} style={{ marginTop:10, width:"100%", padding:"6px",
-        background:"#333", border:"none", borderRadius:8, color:"#aaa", cursor:"pointer", fontSize:12 }}>
-        閉じる
-      </button>
+    </>
+  );
+}
+
+// 絵文字ピッカー
+function EmojiPicker({ value, onChange, onClose }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:2000,
+      display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ background:"#1a1a2e", border:"1px solid #555", borderRadius:14,
+        padding:12, width:290, boxShadow:"0 8px 32px rgba(0,0,0,0.9)" }}>
+        <div style={{ fontWeight:"bold", color:"#fff", marginBottom:8, fontSize:13 }}>絵文字を選択</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(9,1fr)", gap:4, maxHeight:240, overflowY:"auto" }}>
+          {EMOJIS.map((e,i) => (
+            <button key={i} onClick={() => { onChange(e); onClose(); }}
+              style={{ background: e===value?"#444":"transparent", border:"none", borderRadius:6,
+                fontSize:20, cursor:"pointer", padding:3, lineHeight:1.3 }}>
+              {e}
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} style={{ marginTop:10, width:"100%", padding:"7px",
+          background:"#333", border:"none", borderRadius:8, color:"#aaa", cursor:"pointer", fontSize:12 }}>
+          閉じる
+        </button>
+      </div>
     </div>
   );
 }
 
-// ===== 編集モーダル =====
-function EditModal({ title, name, emoji, color, onSave, onDelete, onClose, showEmoji=true, showColor=true }) {
-  const [n, setN] = useState(name || "");
-  const [e, setE] = useState(emoji || "🌾");
-  const [c, setC] = useState(color || "#5b3d8f");
+// 編集モーダル
+function EditModal({ title, initName, initEmoji, initColor, showEmoji, showColor, onSave, onClose }) {
+  const [name, setName] = useState(initName || "");
+  const [emoji, setEmoji] = useState(initEmoji || "🌾");
+  const [color, setColor] = useState(initColor || "#5b3d8f");
   const [emojiOpen, setEmojiOpen] = useState(false);
-
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)",
-      zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:1500,
+      display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ background:"#1e1e30", borderRadius:16, padding:20, width:290, border:"1px solid #555" }}>
         <div style={{ fontWeight:"bold", marginBottom:14, fontSize:15, color:"#fff" }}>{title}</div>
-
-        {/* 絵文字 */}
         {showEmoji && (
           <div style={{ marginBottom:10 }}>
             <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>絵文字</div>
             <button onClick={() => setEmojiOpen(true)} style={{
               background:"#2a2a3a", border:"1px solid #555", borderRadius:8,
-              fontSize:26, cursor:"pointer", padding:"6px 12px"
-            }}>{e}</button>
+              fontSize:28, cursor:"pointer", padding:"6px 14px"
+            }}>{emoji}</button>
           </div>
         )}
-
-        {/* 名前 */}
         <div style={{ marginBottom:10 }}>
           <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>名前</div>
-          <input value={n} onChange={ev => setN(ev.target.value)}
+          <input value={name} onChange={e => setName(e.target.value)}
             style={{ width:"100%", background:"#2a2a3a", border:"1px solid #555", borderRadius:8,
               padding:"8px 10px", color:"#fff", fontSize:13, outline:"none", boxSizing:"border-box" }} />
         </div>
-
-        {/* 色 */}
         {showColor && (
           <div style={{ marginBottom:14 }}>
             <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>カラー</div>
             <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:6 }}>
-              {COLORS.map(col => (
-                <button key={col} onClick={() => setC(col)} style={{
-                  width:32, height:32, borderRadius:"50%", background:col, border:"none",
-                  cursor:"pointer", outline: c===col ? "3px solid #fff" : "none",
-                  outlineOffset:2
+              {CARD_COLORS.map(c => (
+                <button key={c} onClick={() => setColor(c)} style={{
+                  width:32, height:32, borderRadius:"50%", background:c, border:"none",
+                  cursor:"pointer", outline: color===c ? "3px solid #fff" : "none", outlineOffset:2
                 }} />
               ))}
             </div>
           </div>
         )}
-
         <div style={{ display:"flex", gap:8, marginTop:4 }}>
-          <button onClick={() => { if(window.confirm("削除しますか？")) onDelete(); }} style={{
-            padding:"8px 12px", background:"#4a1a1a", border:"1px solid #e53e3e",
-            borderRadius:8, color:"#e53e3e", cursor:"pointer", fontSize:12
-          }}>削除</button>
-          <div style={{ flex:1 }} />
-          <button onClick={onClose} style={{ padding:"8px 14px", background:"#333",
-            border:"none", borderRadius:8, color:"#aaa", cursor:"pointer", fontSize:12 }}>
-            キャンセル
-          </button>
-          <button onClick={() => onSave({ name:n, emoji:e, color:c })} style={{
-            padding:"8px 14px", background:"#5b3d8f", border:"none",
-            borderRadius:8, color:"#fff", cursor:"pointer", fontWeight:"bold", fontSize:12
+          <button onClick={onClose} style={{ flex:1, padding:"8px", background:"#333",
+            border:"none", borderRadius:8, color:"#aaa", cursor:"pointer" }}>キャンセル</button>
+          <button onClick={() => onSave({ name, emoji, color })} style={{
+            flex:1, padding:"8px", background: showColor ? color : "#5b3d8f",
+            border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontWeight:"bold"
           }}>保存</button>
         </div>
       </div>
-      {emojiOpen && <EmojiPicker value={e} onChange={setE} onClose={() => setEmojiOpen(false)} />}
+      {emojiOpen && <EmojiPicker value={emoji} onChange={setEmoji} onClose={() => setEmojiOpen(false)} />}
     </div>
   );
 }
 
-// ===== タスク =====
-function Task({ task, onChange, onDelete, onDragStart, onDragOver, onDrop, dragging }) {
-  const c = P_COLOR[task.pri];
-  const longPressTimer = useRef();
-
-  const handleLongPress = (cb) => ({
-    onTouchStart: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onTouchEnd: () => clearTimeout(longPressTimer.current),
-    onTouchMove: () => clearTimeout(longPressTimer.current),
-    onMouseDown: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onMouseUp: () => clearTimeout(longPressTimer.current),
-    onMouseLeave: () => clearTimeout(longPressTimer.current),
-  });
-
-  const [editOpen, setEditOpen] = useState(false);
+// タスク
+function Task({ task, onChange, onDelete, dragHandlers }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(task.text);
-
-  const openEdit = () => setEditOpen(true);
+  const c = P_COLOR[task.pri];
 
   return (
-    <>
-      <div
-        draggable
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        {...handleLongPress(openEdit)}
-        style={{
-          display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
-          background: dragging ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)",
-          borderRadius:6, marginBottom:2, cursor:"grab",
-          opacity: dragging ? 0.5 : 1,
-          transition:"opacity 0.15s",
-          userSelect:"none",
-        }}>
-        <button onClick={() => onChange({ ...task, done:!task.done })}
-          style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
-            background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
-        {editing
-          ? <input autoFocus value={v} onChange={e => setV(e.target.value)}
-              onBlur={() => { onChange({ ...task, text:v }); setEditing(false); }}
-              onKeyDown={e => e.key==="Enter" && e.target.blur()}
-              style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
-                color:"#fff", fontSize:11, outline:"none" }} />
-          : <span onDoubleClick={() => setEditing(true)}
-              style={{ flex:1, fontSize:11, color: task.done?"#555":"#ddd",
-                textDecoration: task.done?"line-through":"none", lineHeight:1.3 }}>
-              {task.text}
-            </span>
-        }
-        <button onClick={() => {
-          const i = PRIORITIES.indexOf(task.pri);
-          onChange({ ...task, pri: PRIORITIES[(i+1) % PRIORITIES.length] });
-        }} style={{ fontSize:9, fontWeight:"bold", color:c, background:"transparent",
-            border:"none", cursor:"pointer", padding:"1px 2px", flexShrink:0 }}>
-          {task.pri}
-        </button>
-      </div>
-      {editOpen && (
-        <EditModal
-          title="タスクを編集"
-          name={task.text}
-          showEmoji={false}
-          showColor={false}
-          onSave={({ name }) => { onChange({ ...task, text:name }); setEditOpen(false); }}
-          onDelete={() => { onDelete(); setEditOpen(false); }}
-          onClose={() => setEditOpen(false)}
-        />
-      )}
-    </>
+    <div
+      {...dragHandlers}
+      style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
+        background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2,
+        cursor:"grab", userSelect:"none" }}>
+      <button onClick={() => onChange({ ...task, done:!task.done })}
+        style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
+          background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
+      {editing
+        ? <input autoFocus value={v} onChange={e => setV(e.target.value)}
+            onBlur={() => { onChange({ ...task, text:v }); setEditing(false); }}
+            onKeyDown={e => e.key==="Enter" && e.target.blur()}
+            style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
+              color:"#fff", fontSize:11, outline:"none" }} />
+        : <span onClick={() => setEditing(true)}
+            style={{ flex:1, fontSize:11, color: task.done?"#555":"#ddd",
+              textDecoration: task.done?"line-through":"none", lineHeight:1.3, cursor:"text" }}>
+            {task.text}
+          </span>
+      }
+      {/* 優先度タップ → 変更 → 自動ソートは親側で */}
+      <button onClick={() => {
+        const i = PRIORITIES.indexOf(task.pri);
+        onChange({ ...task, pri: PRIORITIES[(i+1) % PRIORITIES.length] });
+      }} style={{ fontSize:9, fontWeight:"bold", color:c, background:"transparent",
+          border:"none", cursor:"pointer", padding:"1px 2px", flexShrink:0 }}>
+        {task.pri}
+      </button>
+      <button onClick={onDelete}
+        style={{ color:"#555", background:"transparent", border:"none", cursor:"pointer", fontSize:11, flexShrink:0 }}>
+        ×
+      </button>
+    </div>
   );
 }
 
-// ===== グループ =====
-function Group({ group, onChange, onAddTask, onDeleteGroup, areaColor }) {
+// グループ
+function Group({ group, onChange, onAddTask, onDelete }) {
+  const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
-  const longPressTimer = useRef();
+  const dragIdx = useRef(null);
 
-  const handleLongPress = (cb) => ({
-    onTouchStart: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onTouchEnd: () => clearTimeout(longPressTimer.current),
-    onTouchMove: () => clearTimeout(longPressTimer.current),
-    onMouseDown: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onMouseUp: () => clearTimeout(longPressTimer.current),
-    onMouseLeave: () => clearTimeout(longPressTimer.current),
+  const lp = useLongPress((e) => {
+    setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
   });
 
-  const upd = (t) => {
-    const updated = group.tasks.map(x => x.id===t.id ? t : x);
-    onChange({ ...group, tasks: sortTasks(updated) });
+  // タスク変更 + 優先度ソート
+  const updTask = (updated) => {
+    onChange({ ...group, tasks: sortByPri(group.tasks.map(t => t.id===updated.id ? updated : t)) });
   };
-  const del = (id) => onChange({ ...group, tasks: group.tasks.filter(x => x.id!==id) });
+  const delTask = (id) => onChange({ ...group, tasks: group.tasks.filter(t => t.id!==id) });
 
+  // ドラッグ（同優先度のみ）
   const handleDrop = (toIdx) => {
-    if (dragIdx === null || dragIdx === toIdx) return;
-    // 同じ優先度のみ入れ替え
-    const from = group.tasks[dragIdx];
-    const to = group.tasks[toIdx];
-    if (from.pri !== to.pri) { setDragIdx(null); return; }
+    const fromIdx = dragIdx.current;
+    if (fromIdx === null || fromIdx === toIdx) return;
+    const from = group.tasks[fromIdx];
+    const to   = group.tasks[toIdx];
+    if (from.pri !== to.pri) return; // 違う優先度は無視
     const tasks = [...group.tasks];
-    tasks.splice(dragIdx, 1);
+    tasks.splice(fromIdx, 1);
     tasks.splice(toIdx, 0, from);
     onChange({ ...group, tasks });
-    setDragIdx(null);
+    dragIdx.current = null;
   };
 
   return (
     <div style={{ marginBottom:4 }}>
       {group.name && (
         <div
-          {...handleLongPress(() => setEditOpen(true))}
+          {...lp}
+          onTouchStart={(e) => { lp.onTouchStart(e); }}
           style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
             marginBottom:3, cursor:"context-menu", userSelect:"none" }}>
           <span style={{ fontSize:10, fontWeight:"bold", color:"#bbb" }}>{group.name}</span>
@@ -308,12 +276,14 @@ function Group({ group, onChange, onAddTask, onDeleteGroup, areaColor }) {
       )}
       {group.tasks.map((t, i) => (
         <Task key={t.id} task={t}
-          dragging={dragIdx === i}
-          onChange={upd}
-          onDelete={() => del(t.id)}
-          onDragStart={() => setDragIdx(i)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={() => handleDrop(i)}
+          onChange={updTask}
+          onDelete={() => delTask(t.id)}
+          dragHandlers={{
+            draggable: true,
+            onDragStart: () => { dragIdx.current = i; },
+            onDragOver: (e) => e.preventDefault(),
+            onDrop: () => handleDrop(i),
+          }}
         />
       ))}
       {!group.name && (
@@ -322,14 +292,22 @@ function Group({ group, onChange, onAddTask, onDeleteGroup, areaColor }) {
           ＋ タスク追加
         </button>
       )}
+
+      {menu && (
+        <ContextMenu
+          x={menu.x} y={menu.y}
+          onEdit={() => setEditOpen(true)}
+          onDelete={onDelete}
+          onClose={() => setMenu(null)}
+        />
+      )}
       {editOpen && (
         <EditModal
           title="圃場を編集"
-          name={group.name}
+          initName={group.name}
           showEmoji={false}
           showColor={false}
           onSave={({ name }) => { onChange({ ...group, name }); setEditOpen(false); }}
-          onDelete={() => { onDeleteGroup(); setEditOpen(false); }}
           onClose={() => setEditOpen(false)}
         />
       )}
@@ -337,18 +315,13 @@ function Group({ group, onChange, onAddTask, onDeleteGroup, areaColor }) {
   );
 }
 
-// ===== 地区カード =====
+// 地区カード
 function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
+  const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const longPressTimer = useRef();
 
-  const handleLongPress = (cb) => ({
-    onTouchStart: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onTouchEnd: () => clearTimeout(longPressTimer.current),
-    onTouchMove: () => clearTimeout(longPressTimer.current),
-    onMouseDown: () => { longPressTimer.current = setTimeout(cb, 500); },
-    onMouseUp: () => clearTimeout(longPressTimer.current),
-    onMouseLeave: () => clearTimeout(longPressTimer.current),
+  const lp = useLongPress(() => {
+    // タッチ座標を使いたいので別途
   });
 
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
@@ -357,14 +330,27 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
     { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
 
+  const handleHeaderLongPress = (e) => {
+    const rect = e.currentTarget?.getBoundingClientRect?.() || {};
+    const x = e.touches ? e.touches[0].clientX : (e.clientX || rect.left + 40);
+    const y = e.touches ? e.touches[0].clientY : (e.clientY || rect.bottom);
+    setMenu({ x, y });
+  };
+
+  const headerLP = useLongPress((e) => handleHeaderLongPress(e));
+
   return (
-    <div style={{
-      background: area.color+"bb", borderRadius:10, padding:8,
-      border:`1px solid ${area.color}99`,
-    }}>
-      {/* ヘッダー長押しで編集 */}
+    <div style={{ background: area.color+"bb", borderRadius:10, padding:8, border:`1px solid ${area.color}99` }}>
       <div
-        {...handleLongPress(() => setEditOpen(true))}
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          headerLP.onTouchStart({ clientX: touch.clientX, clientY: touch.clientY });
+        }}
+        onTouchEnd={headerLP.onTouchEnd}
+        onTouchMove={headerLP.onTouchMove}
+        onMouseDown={(e) => headerLP.onMouseDown(e)}
+        onMouseUp={headerLP.onMouseUp}
+        onMouseLeave={headerLP.onMouseLeave}
         style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6,
           cursor:"context-menu", userSelect:"none" }}>
         <span style={{ fontSize:18, lineHeight:1 }}>{area.emoji}</span>
@@ -381,24 +367,29 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
 
       {area.groups.map(g => (
         <Group key={g.id} group={g}
-          areaColor={area.color}
           onChange={updGroup}
           onAddTask={() => onAddTask(area.id, g.id)}
-          onDeleteGroup={() => delGroup(g.id)}
+          onDelete={() => delGroup(g.id)}
         />
       ))}
 
+      {menu && (
+        <ContextMenu
+          x={menu.x} y={menu.y}
+          onEdit={() => setEditOpen(true)}
+          onDelete={onDelete}
+          onClose={() => setMenu(null)}
+        />
+      )}
       {editOpen && (
         <EditModal
           title="地区を編集"
-          name={area.name}
-          emoji={area.emoji}
-          color={area.color}
-          onSave={({ name, emoji, color }) => {
-            onUpdate({ ...area, name, emoji, color });
-            setEditOpen(false);
-          }}
-          onDelete={() => { onDelete(); setEditOpen(false); }}
+          initName={area.name}
+          initEmoji={area.emoji}
+          initColor={area.color}
+          showEmoji={true}
+          showColor={true}
+          onSave={({ name, emoji, color }) => { onUpdate({ ...area, name, emoji, color }); setEditOpen(false); }}
           onClose={() => setEditOpen(false)}
         />
       )}
@@ -406,7 +397,7 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   );
 }
 
-// ===== アプリ本体 =====
+// アプリ本体
 function App() {
   const [areas, setAreas] = useState(INIT);
   const [modal, setModal] = useState(false);
@@ -430,7 +421,7 @@ function App() {
     const newTask = { id: nid(), text: "新タスク", pri: "中", done: false };
     setAreas(prev => prev.map(a => a.id !== areaId ? a : {
       ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
-        ...g, tasks: sortTasks([...g.tasks, newTask])
+        ...g, tasks: sortByPri([...g.tasks, newTask])
       })
     }));
     setTimeout(() => {
@@ -480,7 +471,7 @@ function App() {
       {toast && (
         <div style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)",
           background:"#1e1e1e", border:"1px solid #e53e3e", borderRadius:12,
-          padding:"14px 20px", zIndex:200, color:"#fff", fontSize:13,
+          padding:"14px 20px", zIndex:500, color:"#fff", fontSize:13,
           textAlign:"center", boxShadow:"0 4px 20px rgba(0,0,0,0.9)" }}>
           ⚠️ これ以上は一杯なため<br />追加できません
         </div>
@@ -495,7 +486,7 @@ function App() {
               <div style={{ fontSize:11, color:"#aaa", marginBottom:4 }}>絵文字</div>
               <button onClick={() => setEmojiOpen(true)} style={{
                 background:"#2a2a3a", border:"1px solid #555", borderRadius:8,
-                fontSize:26, cursor:"pointer", padding:"6px 12px"
+                fontSize:28, cursor:"pointer", padding:"6px 14px"
               }}>{newEmoji}</button>
             </div>
             <div style={{ marginBottom:10 }}>
@@ -508,10 +499,10 @@ function App() {
             <div style={{ marginBottom:14 }}>
               <div style={{ fontSize:11, color:"#aaa", marginBottom:6 }}>カラー</div>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:6 }}>
-                {COLORS.map(col => (
-                  <button key={col} onClick={() => setNewColor(col)} style={{
-                    width:32, height:32, borderRadius:"50%", background:col, border:"none",
-                    cursor:"pointer", outline: newColor===col ? "3px solid #fff" : "none", outlineOffset:2
+                {CARD_COLORS.map(c => (
+                  <button key={c} onClick={() => setNewColor(c)} style={{
+                    width:32, height:32, borderRadius:"50%", background:c, border:"none",
+                    cursor:"pointer", outline: newColor===c ? "3px solid #fff" : "none", outlineOffset:2
                   }} />
                 ))}
               </div>
@@ -528,16 +519,13 @@ function App() {
       )}
 
       <div style={{ position:"relative", flex:1, overflow:"hidden" }}>
-        <div style={{
-          position:"absolute", bottom:0, left:0, width:"calc(50% - 4px)", height:36,
+        <div style={{ position:"absolute", bottom:0, left:0, width:"calc(50% - 4px)", height:36,
           background:"linear-gradient(to bottom, transparent, rgba(80,60,160,0.3))",
-          borderBottom:"2px dashed #5a4a9a", zIndex:5, pointerEvents:"none",
-        }} />
-        <div style={{
-          position:"absolute", top:0, right:0, width:"calc(50% - 4px)", height:36,
+          borderBottom:"2px dashed #5a4a9a", zIndex:5, pointerEvents:"none" }} />
+        <div style={{ position:"absolute", top:0, right:0, width:"calc(50% - 4px)", height:36,
           background:"linear-gradient(to top, transparent, rgba(80,60,160,0.3))",
-          borderTop:"2px dashed #5a4a9a", zIndex:5, pointerEvents:"none",
-        }} />
+          borderTop:"2px dashed #5a4a9a", zIndex:5, pointerEvents:"none" }} />
+
         <div ref={colRef} style={{
           height:"100%", columnCount:2, columnGap:8, columnFill:"auto",
           columnRuleWidth:"2px", columnRuleStyle:"dashed", columnRuleColor:"#3a3a5a",
