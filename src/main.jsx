@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 const PRIORITIES = ["急", "中", "低"];
@@ -369,17 +369,18 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
-        {/* 圃場が1つ(名前なし)→タスク追加、複数→圃場追加 */}
-        <button onClick={e => {
-          e.stopPropagation();
-          if (area.groups.length === 1 && area.groups[0].name === null) {
-            onAddTask(area.id, area.groups[0].id);
-          } else {
-            addGroup();
-          }
-        }} style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
-          cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
-          alignItems:"center", justifyContent:"center" }}>+</button>
+        {/* タスク追加＋ (圃場が1つのときのみ) */}
+        {area.groups.length === 1 && area.groups[0].name === null && (
+          <button onClick={e => { e.stopPropagation(); onAddTask(area.id, area.groups[0].id); }}
+            style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
+              cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
+              alignItems:"center", justifyContent:"center" }}>+</button>
+        )}
+        {/* 圃場追加＋ (常に表示) */}
+        <button onClick={e => { e.stopPropagation(); addGroup(); }}
+          style={{ background:"rgba(255,255,255,0.25)", border:"none", borderRadius:4, color:"#fff",
+            cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
+            alignItems:"center", justifyContent:"center" }}>🏡</button>
       </div>
 
       {area.groups.map(g => (
@@ -414,9 +415,17 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
   );
 }
 
+// localStorage helpers
+const load = (key, fallback) => {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+};
+const save = (key, val) => {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+};
+
 // アプリ本体
 function App() {
-  const [areas, setAreas] = useState(INIT);
+  const [areas, setAreas] = useState(() => load("areas", INIT));
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
@@ -424,6 +433,9 @@ function App() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [toast, setToast] = useState(false);
   const colRef = useRef();
+
+  // areasが変わるたびに自動保存
+  useEffect(() => { save("areas", areas); }, [areas]);
 
   const upd = (a) => setAreas(prev => prev.map(x => x.id===a.id ? a : x));
   const del = (id) => setAreas(prev => prev.filter(x => x.id!==id));
@@ -465,10 +477,45 @@ function App() {
 
   const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
-  const [yearGoal, setYearGoal] = useState("年間目標を入力…");
-  const [todayGoal, setTodayGoal] = useState("今日の目標を入力…");
+  const [yearGoal, setYearGoal] = useState(() => load("yearGoal", "年間目標を入力…"));
+  const [todayGoal, setTodayGoal] = useState(() => load("todayGoal", "今日の目標を入力…"));
   const [editYear, setEditYear] = useState(false);
   const [editToday, setEditToday] = useState(false);
+  const [logs, setLogs] = useState(() => load("logs", []));
+  const [logOpen, setLogOpen] = useState(false);
+  const [logText, setLogText] = useState("");
+  const [logDate, setLogDate] = useState("");
+
+  useEffect(() => { save("yearGoal", yearGoal); }, [yearGoal]);
+  useEffect(() => { save("todayGoal", todayGoal); }, [todayGoal]);
+  useEffect(() => { save("logs", logs); }, [logs]);
+
+  const today = () => new Date().toLocaleDateString("ja-JP", { month:"numeric", day:"numeric", weekday:"short" });
+
+  // タスク完了時に自動ログ
+  const updWithLog = (updated) => {
+    upd(updated);
+    // 完了になったタスクを検出してログへ
+    const prev = areas.find(a => a.id === updated.id);
+    if (!prev) return;
+    updated.groups.forEach(ng => {
+      const og = prev.groups.find(g => g.id === ng.id);
+      if (!og) return;
+      ng.tasks.forEach(nt => {
+        const ot = og.tasks.find(t => t.id === nt.id);
+        if (ot && !ot.done && nt.done) {
+          const entry = {
+            id: nid(),
+            date: new Date().toLocaleDateString("ja-JP"),
+            time: new Date().toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit" }),
+            text: `✅ ${updated.name} › ${nt.text}`,
+            manual: false,
+          };
+          setLogs(prev => [entry, ...prev]);
+        }
+      });
+    });
+  };
 
   return (
     <div style={{ height:"100vh", display:"flex", flexDirection:"column",
@@ -494,6 +541,8 @@ function App() {
             fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold", flexShrink:0 }}>
             {total}
           </span>
+          <button onClick={() => setLogOpen(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
+            color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>📋 ログ</button>
           <button style={{ background:"#2a2a3a", border:"none", borderRadius:6,
             color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>完了▼</button>
           <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
@@ -579,11 +628,89 @@ function App() {
         }}>
           {areas.map((area, i) => (
             <div key={area.id} style={{ marginBottom: i < areas.length-1 ? 6 : 0, width:"100%" }}>
-              <AreaCard area={area} onUpdate={upd} onDelete={() => del(area.id)} onAddTask={addTask} />
+              <AreaCard area={area} onUpdate={updWithLog} onDelete={() => del(area.id)} onAddTask={addTask} />
             </div>
           ))}
         </div>
       </div>
+
+      {/* 作業ログモーダル */}
+      {logOpen && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:300,
+          display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+          <div style={{ background:"#1e1e30", borderRadius:"16px 16px 0 0", width:"100%",
+            maxHeight:"80vh", display:"flex", flexDirection:"column", border:"1px solid #444" }}>
+            {/* ログヘッダー */}
+            <div style={{ display:"flex", alignItems:"center", padding:"12px 14px 8px",
+              borderBottom:"1px solid #2a2a3a" }}>
+              <span style={{ fontWeight:"bold", fontSize:14, flex:1 }}>📋 作業ログ</span>
+              <button onClick={() => setLogs([])} style={{ background:"transparent", border:"none",
+                color:"#666", fontSize:11, cursor:"pointer", marginRight:10 }}>全削除</button>
+              <button onClick={() => setLogOpen(false)} style={{ background:"transparent", border:"none",
+                color:"#aaa", fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>
+            </div>
+            {/* 手動ログ入力 */}
+            <div style={{ display:"flex", gap:6, padding:"8px 12px", borderBottom:"1px solid #2a2a3a" }}>
+              <input value={logText} onChange={e => setLogText(e.target.value)}
+                placeholder="作業メモを入力…"
+                onKeyDown={e => {
+                  if (e.key==="Enter" && logText.trim()) {
+                    setLogs(prev => [{ id:nid(),
+                      date: new Date().toLocaleDateString("ja-JP"),
+                      time: new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+                      text: logText.trim(), manual:true }, ...prev]);
+                    setLogText("");
+                  }
+                }}
+                style={{ flex:1, background:"#2a2a3a", border:"1px solid #444", borderRadius:7,
+                  padding:"6px 10px", color:"#fff", fontSize:12, outline:"none" }} />
+              <button onClick={() => {
+                if (!logText.trim()) return;
+                setLogs(prev => [{ id:nid(),
+                  date: new Date().toLocaleDateString("ja-JP"),
+                  time: new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}),
+                  text: logText.trim(), manual:true }, ...prev]);
+                setLogText("");
+              }} style={{ background:"#5b3d8f", border:"none", borderRadius:7, color:"#fff",
+                padding:"6px 12px", cursor:"pointer", fontSize:12 }}>追加</button>
+            </div>
+            {/* ログ一覧 — 日付でグループ */}
+            <div style={{ overflowY:"auto", flex:1, padding:"8px 12px" }}>
+              {logs.length === 0
+                ? <div style={{ color:"#555", fontSize:12, textAlign:"center", marginTop:20 }}>ログがありません</div>
+                : (() => {
+                    // 日付ごとにグループ化
+                    const grouped = {};
+                    logs.forEach(l => {
+                      if (!grouped[l.date]) grouped[l.date] = [];
+                      grouped[l.date].push(l);
+                    });
+                    return Object.entries(grouped).map(([date, items]) => (
+                      <div key={date} style={{ marginBottom:12 }}>
+                        <div style={{ fontSize:10, color:"#888", fontWeight:"bold",
+                          marginBottom:4, borderBottom:"1px solid #2a2a3a", paddingBottom:2 }}>
+                          {date}
+                        </div>
+                        {items.map(l => (
+                          <div key={l.id} style={{ display:"flex", alignItems:"flex-start", gap:8,
+                            padding:"5px 0", borderBottom:"1px solid #1e1e2a" }}>
+                            <span style={{ fontSize:10, color:"#666", flexShrink:0, marginTop:1 }}>{l.time}</span>
+                            <span style={{ fontSize:12, color: l.manual?"#ddd":"#aaa", flex:1, lineHeight:1.4 }}>
+                              {l.text}
+                            </span>
+                            <button onClick={() => setLogs(prev => prev.filter(x => x.id!==l.id))}
+                              style={{ background:"transparent", border:"none", color:"#444",
+                                cursor:"pointer", fontSize:11, flexShrink:0 }}>×</button>
+                          </div>
+                        ))}
+                      </div>
+                    ));
+                  })()
+              }
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
