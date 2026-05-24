@@ -454,9 +454,25 @@ const save = (key, val) => {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 };
 
+// 全IDを強制的に新しいUUIDに置き換え（重複を完全排除）
+const migrateAreas = (areas) => {
+  return areas.map(a => ({
+    ...a,
+    id: nid(),
+    groups: a.groups.map(g => ({
+      ...g,
+      id: nid(),
+      tasks: g.tasks.map(t => ({
+        ...t,
+        id: nid(),
+      }))
+    }))
+  }));
+};
+
 // アプリ本体
 function App() {
-  const [areas, setAreas] = useState(() => load("areas", INIT));
+  const [areas, setAreas] = useState(() => migrateAreas(load("areas", INIT)));
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
