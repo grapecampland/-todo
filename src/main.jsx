@@ -22,8 +22,7 @@ const CARD_COLORS = [
   "#8f5b3d","#3d8f5b","#8f3d5b","#5b8f3d",
 ];
 
-let _id = 100;
-const nid = () => String(_id++);
+const nid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const INIT = [
   { id:"1", name:"金山", emoji:"🌾", color:"#5b3d8f", groups:[
