@@ -343,16 +343,14 @@ function Group({ group, onChange, onAddTask, onDelete }) {
 }
 
 // 地区カード
-function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
+function AreaCard({ area, setAreas, onDelete, onAddTask }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  const lp = useLongPress(() => {
-    // タッチ座標を使いたいので別途
-  });
+  const lp = useLongPress(() => {});
 
+  const onUpdate = (updated) => setAreas(prev => prev.map(a => a.id===updated.id ? updated : a));
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
-  const updGroup = (g) => onUpdate({ ...area, groups: area.groups.map(x => x.id===g.id ? g : x) });
   const delGroup = (gid) => onUpdate({ ...area, groups: area.groups.filter(g => g.id!==gid) });
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
     { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
@@ -400,8 +398,7 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
-        {/* タスク追加＋ (圃場が1つのときのみ) */}
-        {area.groups.length === 1 && area.groups[0].name === null && (
+          {area.groups.length === 1 && area.groups[0].name === null && (
           <button onClick={e => { e.stopPropagation(); onAddTask(area.id, area.groups[0].id); }}
             style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
               cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
@@ -416,7 +413,9 @@ function AreaCard({ area, onUpdate, onDelete, onAddTask }) {
 
       {area.groups.map(g => (
         <Group key={g.id} group={g}
-          onChange={updGroup}
+          onChange={(updatedGroup) => setAreas(prev => prev.map(a => a.id!==area.id ? a : {
+            ...a, groups: a.groups.map(x => x.id===updatedGroup.id ? updatedGroup : x)
+          }))}
           onAddTask={() => onAddTask(area.id, g.id)}
           onDelete={() => delGroup(g.id)}
         />
@@ -462,17 +461,27 @@ const migrateAreas = (areas) => {
     groups: a.groups.map(g => ({
       ...g,
       id: nid(),
-      tasks: g.tasks.map(t => ({
-        ...t,
-        id: nid(),
-      }))
+      tasks: g.tasks.map(t => ({ ...t, id: nid() }))
     }))
   }));
 };
 
+// バージョン管理：v2未満のデータは全IDを再生成
+const loadAreas = () => {
+  const ver = localStorage.getItem("dataVer");
+  const raw = load("areas", INIT);
+  if (ver !== "v2") {
+    const migrated = migrateAreas(raw);
+    save("areas", migrated);
+    localStorage.setItem("dataVer", "v2");
+    return migrated;
+  }
+  return raw;
+};
+
 // アプリ本体
 function App() {
-  const [areas, setAreas] = useState(() => migrateAreas(load("areas", INIT)));
+  const [areas, setAreas] = useState(() => loadAreas());
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
