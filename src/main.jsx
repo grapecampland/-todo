@@ -189,10 +189,11 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
 
   return (
     <div
-      {...dragHandlers}
       style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
         background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2,
-        cursor:"grab", userSelect:"none" }}>
+        userSelect:"none" }}>
+      {/* ドラッグハンドル */}
+      <span {...dragHandlers} style={{ color:"#444", fontSize:12, cursor:"grab", flexShrink:0, touchAction:"none" }}>⠿</span>
       <button onClick={() => onChange({ ...task, done:!task.done })}
         style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
           background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
@@ -231,7 +232,7 @@ function Group({ group, onChange, onAddTask, onDelete }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
   const taskRefs = useRef([]);
-  const dragging = useRef(null); // { idx, startY, currentY }
+  const dragState = useRef(null);
 
   const lp = useLongPress((e) => {
     setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
@@ -242,48 +243,49 @@ function Group({ group, onChange, onAddTask, onDelete }) {
   };
   const delTask = (id) => onChange({ ...group, tasks: group.tasks.filter(t => t.id!==id) });
 
-  // タッチドラッグ処理
-  const handleTouchStart = (idx) => (e) => {
-    dragging.current = { idx, startY: e.touches[0].clientY };
-    setDragIdx(idx);
-  };
-
-  const handleTouchMove = (e) => {
-    if (dragging.current === null) return;
-    e.preventDefault();
-    const y = e.touches[0].clientY;
-    // どのタスク行の上にいるか判定
+  const getOverIdx = (clientY) => {
     let found = null;
     taskRefs.current.forEach((ref, i) => {
       if (!ref) return;
       const rect = ref.getBoundingClientRect();
-      if (y >= rect.top && y <= rect.bottom) found = i;
+      if (clientY >= rect.top && clientY <= rect.bottom) found = i;
     });
-    if (found !== null) setOverIdx(found);
+    return found;
   };
 
-  const handleTouchEnd = () => {
-    if (dragging.current !== null && overIdx !== null) {
-      const fromIdx = dragging.current.idx;
-      const toIdx = overIdx;
-      if (fromIdx !== toIdx) {
-        const from = group.tasks[fromIdx];
-        const to   = group.tasks[toIdx];
-        if (from.pri === to.pri) {
-          const tasks = [...group.tasks];
-          tasks.splice(fromIdx, 1);
-          tasks.splice(toIdx, 0, from);
-          onChange({ ...group, tasks });
-        }
+  const onPointerDown = (idx) => (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragState.current = { idx };
+    setDragIdx(idx);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragState.current) return;
+    const over = getOverIdx(e.clientY);
+    if (over !== null) setOverIdx(over);
+  };
+
+  const onPointerUp = (e) => {
+    if (!dragState.current) return;
+    const fromIdx = dragState.current.idx;
+    const toIdx = overIdx;
+    if (toIdx !== null && fromIdx !== toIdx) {
+      const from = group.tasks[fromIdx];
+      const to   = group.tasks[toIdx];
+      if (from.pri === to.pri) {
+        const tasks = [...group.tasks];
+        tasks.splice(fromIdx, 1);
+        tasks.splice(toIdx, 0, from);
+        onChange({ ...group, tasks });
       }
     }
-    dragging.current = null;
+    dragState.current = null;
     setDragIdx(null);
     setOverIdx(null);
   };
 
   return (
-    <div style={{ marginBottom:4 }} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+    <div style={{ marginBottom:4 }} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
       {group.name && (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
           <span
@@ -308,14 +310,12 @@ function Group({ group, onChange, onAddTask, onDelete }) {
           style={{
             opacity: dragIdx === i ? 0.4 : 1,
             borderTop: overIdx === i && dragIdx !== i ? "2px solid #a78bfa" : "2px solid transparent",
-            transition: "opacity 0.15s",
+            transition: "opacity 0.1s",
           }}>
           <Task task={t}
             onChange={updTask}
             onDelete={() => delTask(t.id)}
-            dragHandlers={{
-              onTouchStart: handleTouchStart(i),
-            }}
+            dragHandlers={{ onPointerDown: onPointerDown(i) }}
           />
         </div>
       ))}
