@@ -684,7 +684,7 @@ function App() {
         }}>
           {areas.map((area, i) => (
             <div key={area.id} style={{ marginBottom: i < areas.length-1 ? 6 : 0, width:"100%" }}>
-              <AreaCard area={area} onUpdate={updWithLog} onDelete={() => del(area.id)} onAddTask={addTask} />
+              <AreaCard area={area} setAreas={setAreas} onDelete={() => del(area.id)} onAddTask={addTask} />
             </div>
           ))}
         </div>
