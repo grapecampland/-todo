@@ -228,34 +228,62 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
 function Group({ group, onChange, onAddTask, onDelete }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const dragIdx = useRef(null);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const taskRefs = useRef([]);
+  const dragging = useRef(null); // { idx, startY, currentY }
 
   const lp = useLongPress((e) => {
     setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
   });
 
-  // タスク変更 + 優先度ソート
   const updTask = (updated) => {
     onChange({ ...group, tasks: sortByPri(group.tasks.map(t => t.id===updated.id ? updated : t)) });
   };
   const delTask = (id) => onChange({ ...group, tasks: group.tasks.filter(t => t.id!==id) });
 
-  // ドラッグ（同優先度のみ）
-  const handleDrop = (toIdx) => {
-    const fromIdx = dragIdx.current;
-    if (fromIdx === null || fromIdx === toIdx) return;
-    const from = group.tasks[fromIdx];
-    const to   = group.tasks[toIdx];
-    if (from.pri !== to.pri) return; // 違う優先度は無視
-    const tasks = [...group.tasks];
-    tasks.splice(fromIdx, 1);
-    tasks.splice(toIdx, 0, from);
-    onChange({ ...group, tasks });
-    dragIdx.current = null;
+  // タッチドラッグ処理
+  const handleTouchStart = (idx) => (e) => {
+    dragging.current = { idx, startY: e.touches[0].clientY };
+    setDragIdx(idx);
+  };
+
+  const handleTouchMove = (e) => {
+    if (dragging.current === null) return;
+    e.preventDefault();
+    const y = e.touches[0].clientY;
+    // どのタスク行の上にいるか判定
+    let found = null;
+    taskRefs.current.forEach((ref, i) => {
+      if (!ref) return;
+      const rect = ref.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom) found = i;
+    });
+    if (found !== null) setOverIdx(found);
+  };
+
+  const handleTouchEnd = () => {
+    if (dragging.current !== null && overIdx !== null) {
+      const fromIdx = dragging.current.idx;
+      const toIdx = overIdx;
+      if (fromIdx !== toIdx) {
+        const from = group.tasks[fromIdx];
+        const to   = group.tasks[toIdx];
+        if (from.pri === to.pri) {
+          const tasks = [...group.tasks];
+          tasks.splice(fromIdx, 1);
+          tasks.splice(toIdx, 0, from);
+          onChange({ ...group, tasks });
+        }
+      }
+    }
+    dragging.current = null;
+    setDragIdx(null);
+    setOverIdx(null);
   };
 
   return (
-    <div style={{ marginBottom:4 }}>
+    <div style={{ marginBottom:4 }} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       {group.name && (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
           <span
@@ -276,16 +304,20 @@ function Group({ group, onChange, onAddTask, onDelete }) {
         </div>
       )}
       {group.tasks.map((t, i) => (
-        <Task key={t.id} task={t}
-          onChange={updTask}
-          onDelete={() => delTask(t.id)}
-          dragHandlers={{
-            draggable: true,
-            onDragStart: () => { dragIdx.current = i; },
-            onDragOver: (e) => e.preventDefault(),
-            onDrop: () => handleDrop(i),
-          }}
-        />
+        <div key={t.id} ref={el => taskRefs.current[i] = el}
+          style={{
+            opacity: dragIdx === i ? 0.4 : 1,
+            borderTop: overIdx === i && dragIdx !== i ? "2px solid #a78bfa" : "2px solid transparent",
+            transition: "opacity 0.15s",
+          }}>
+          <Task task={t}
+            onChange={updTask}
+            onDelete={() => delTask(t.id)}
+            dragHandlers={{
+              onTouchStart: handleTouchStart(i),
+            }}
+          />
+        </div>
       ))}
 
 
