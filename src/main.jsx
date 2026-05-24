@@ -188,12 +188,12 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
   const c = P_COLOR[task.pri];
 
   return (
-    <div
-      style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
-        background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2,
-        userSelect:"none" }}>
-      {/* ドラッグハンドル */}
-      <span {...dragHandlers} style={{ color:"#444", fontSize:12, cursor:"grab", flexShrink:0, touchAction:"none" }}>⠿</span>
+    <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
+      background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2, userSelect:"none" }}>
+      <span {...dragHandlers} style={{
+        color:"#555", fontSize:14, cursor:"grab", flexShrink:0,
+        touchAction:"none", padding:"0 2px", lineHeight:1
+      }}>⠿</span>
       <button onClick={() => onChange({ ...task, done:!task.done })}
         style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
           background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
