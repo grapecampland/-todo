@@ -66,78 +66,17 @@ const sortByPri = (tasks) => {
   return [...tasks].sort((a,b) => order[a.pri] - order[b.pri]);
 };
 
-// ===== グローバルドラッグシステム =====
-// 専用ハンドルをタッチダウンした瞬間からドラッグ開始
-const useDrag = (items, onReorder, getItemEl, sameCheck) => {
-  const [dragIdx, setDragIdx] = useState(null);
-  const [overIdx, setOverIdx] = useState(null);
-  const overIdxRef = useRef(null);
-
-  const findOver = (y, excludeIdx) => {
-    const els = getItemEl();
-    let found = null;
-    els.forEach((el, i) => {
-      if (!el || i === excludeIdx) return;
-      const r = el.getBoundingClientRect();
-      if (y >= r.top && y <= r.bottom) found = i;
-    });
-    return found;
-  };
-
-  const start = (idx) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragIdx(idx);
-    overIdxRef.current = null;
-
-    const getY = (ev) => ev.touches ? ev.touches[0].clientY : ev.clientY;
-
-    const move = (ev) => {
-      ev.preventDefault();
-      const over = findOver(getY(ev), idx);
-      if (over !== null && over !== overIdxRef.current) {
-        overIdxRef.current = over;
-        setOverIdx(over);
-      }
-    };
-
-    const end = () => {
-      const toIdx = overIdxRef.current;
-      if (toIdx !== null && toIdx !== idx) {
-        const from = items[idx];
-        const to   = items[toIdx];
-        if (!sameCheck || sameCheck(from, to)) {
-          const next = [...items];
-          next.splice(idx, 1);
-          next.splice(toIdx, 0, from);
-          onReorder(next);
-        }
-      }
-      setDragIdx(null);
-      setOverIdx(null);
-      overIdxRef.current = null;
-      document.removeEventListener("mousemove", move);
-      document.removeEventListener("mouseup", end);
-      document.removeEventListener("touchmove", move);
-      document.removeEventListener("touchend", end);
-    };
-
-    document.addEventListener("mousemove", move, { passive: false });
-    document.addEventListener("mouseup", end);
-    document.addEventListener("touchmove", move, { passive: false });
-    document.addEventListener("touchend", end);
-  };
-
-  // ハンドルボタンのスタイル
-  const handleStyle = {
-    background: "transparent", border: "none",
-    color: "#666", fontSize: 14, cursor: "grab",
-    padding: "0 4px", touchAction: "none",
-    userSelect: "none", flexShrink: 0, lineHeight: 1,
-  };
-
-  return { start, dragIdx, overIdx, handleStyle };
+// 配列の要素を上下に移動
+const moveItem = (arr, idx, dir) => {
+  const next = [...arr];
+  const to = idx + dir;
+  if (to < 0 || to >= next.length) return arr;
+  [next[idx], next[to]] = [next[to], next[idx]];
+  return next;
 };
+
+// 長押し検出フック
+function useLongPress(callback, ms=500) {
   const timer = useRef(null);
   const start = (e) => {
     e.preventDefault();
@@ -250,21 +189,34 @@ function EditModal({ title, initName, initEmoji, initColor, showEmoji, showColor
   );
 }
 
+// ↑↓ 並び替えボタン
+function MoveButtons({ onUp, onDown, canUp, canDown }) {
+  const btn = (label, onClick, enabled) => (
+    <button onClick={onClick} disabled={!enabled} style={{
+      background: enabled ? "rgba(255,255,255,0.15)" : "transparent",
+      border:"none", borderRadius:3, color: enabled ? "#ccc" : "#444",
+      cursor: enabled ? "pointer" : "default",
+      width:16, height:16, fontSize:10, display:"flex",
+      alignItems:"center", justifyContent:"center", padding:0, flexShrink:0,
+    }}>{label}</button>
+  );
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
+      {btn("▲", onUp, canUp)}
+      {btn("▼", onDown, canDown)}
+    </div>
+  );
+}
+
 // タスク
-function Task({ task, onChange, onDelete, dragHandlers }) {
+function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(task.text);
   const c = P_COLOR[task.pri];
 
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
-      background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2, userSelect:"none" }}>
-      {/* ドラッグハンドル */}
-      <button {...dragHandlers} style={{
-        background:"transparent", border:"none", color:"#555", fontSize:13,
-        cursor:"grab", padding:"0 2px", touchAction:"none", userSelect:"none",
-        flexShrink:0, lineHeight:1,
-      }}>☰</button>
+    <div style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 6px",
+      background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2 }}>
       <button onClick={() => onDelete(task)}
         style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
           background:"transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
@@ -279,7 +231,6 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
             {task.text}
           </span>
       }
-      {/* 優先度タップ → 変更 → 自動ソートは親側で */}
       <button onClick={() => {
         const i = PRIORITIES.indexOf(task.pri);
         onChange({ ...task, pri: PRIORITIES[(i+1) % PRIORITIES.length] });
@@ -287,7 +238,8 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
           border:"none", cursor:"pointer", padding:"1px 2px", flexShrink:0 }}>
         {task.pri}
       </button>
-      <button onClick={onDelete}
+      <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
+      <button onClick={() => onDelete(task)}
         style={{ color:"#555", background:"transparent", border:"none", cursor:"pointer", fontSize:11, flexShrink:0 }}>
         ×
       </button>
@@ -296,12 +248,9 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
 }
 
 // グループ
-function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
+function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [dragIdx, setDragIdx_] = useState(null);
-  const [overIdx, setOverIdx_] = useState(null);
-  const taskRefs = useRef([]);
 
   const lp = useLongPress((e) => {
     setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
@@ -313,13 +262,14 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
   const delTask = (task) => {
     onChange({ ...group, tasks: group.tasks.filter(t => t.id!==task.id) });
   };
-
-  const { start: taskDragStart, dragIdx, overIdx } = useDrag(
-    group.tasks,
-    (next) => onChange({ ...group, tasks: next }),
-    () => taskRefs.current,
-    (a, b) => a.pri === b.pri
-  );
+  const moveTask = (idx, dir) => {
+    // 同じ優先度内でのみ移動
+    const tasks = group.tasks;
+    const target = tasks[idx];
+    const dest = tasks[idx + dir];
+    if (!dest || dest.pri !== target.pri) return;
+    onChange({ ...group, tasks: moveItem(tasks, idx, dir) });
+  };
 
   return (
     <div style={{ marginBottom:4 }}>
@@ -328,7 +278,7 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
           <span
             {...lp}
             onTouchStart={(e) => { lp.onTouchStart(e); }}
-            style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"text", userSelect:"none", flex:1 }}>
+            style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"context-menu", userSelect:"none", flex:1 }}>
             {group.name}
           </span>
           <div style={{ display:"flex", gap:3, alignItems:"center" }}>
@@ -339,50 +289,31 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
             <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
               borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
               display:"flex", alignItems:"center", justifyContent:"center" }}>＋</button>
-            {/* 圃場ドラッグハンドル */}
-            <button
-              onMouseDown={onGroupDragStart}
-              onTouchStart={onGroupDragStart}
-              style={{ background:"transparent", border:"none", color:"#666", fontSize:13,
-                cursor:"grab", padding:"0 2px", touchAction:"none", userSelect:"none", lineHeight:1 }}>
-              ☰
-            </button>
+            <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
           </div>
         </div>
       )}
       {group.tasks.map((t, i) => (
-        <div key={t.id} ref={el => taskRefs.current[i] = el}
-          style={{
-            opacity: dragIdx === i ? 0.4 : 1,
-            borderTop: overIdx === i && dragIdx !== i ? "2px solid #a78bfa" : "2px solid transparent",
-            transition: "opacity 0.1s",
-          }}>
-          <Task task={t}
-            onChange={updTask}
-            onDelete={(task) => delTask(task)}
-            dragHandlers={{
-              onMouseDown: taskDragStart(i),
-              onTouchStart: taskDragStart(i),
-            }}
-          />
-        </div>
+        <Task key={t.id} task={t}
+          onChange={updTask}
+          onDelete={delTask}
+          onMoveUp={() => moveTask(i, -1)}
+          onMoveDown={() => moveTask(i, 1)}
+          canUp={i > 0 && group.tasks[i-1].pri === t.pri}
+          canDown={i < group.tasks.length-1 && group.tasks[i+1].pri === t.pri}
+        />
       ))}
 
-
       {menu && (
-        <ContextMenu
-          x={menu.x} y={menu.y}
+        <ContextMenu x={menu.x} y={menu.y}
           onEdit={() => setEditOpen(true)}
           onDelete={onDelete}
           onClose={() => setMenu(null)}
         />
       )}
       {editOpen && (
-        <EditModal
-          title="圃場を編集"
-          initName={group.name}
-          showEmoji={false}
-          showColor={false}
+        <EditModal title="圃場を編集" initName={group.name}
+          showEmoji={false} showColor={false}
           onSave={({ name }) => { onChange({ ...group, name }); setEditOpen(false); }}
           onClose={() => setEditOpen(false)}
         />
@@ -392,26 +323,18 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
 }
 
 // 地区カード
-function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
+function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
 
-  const lp = useLongPress(() => {});
-
-  const onUpdate = (updated) => setAreasWithHistory(prev => prev.map(a => a.id===updated.id ? updated : a));
+  const onUpdate = (updated) => setAreas(prev => prev.map(a => a.id===updated.id ? updated : a));
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
   const delGroup = (gid) => onUpdate({ ...area, groups: area.groups.filter(g => g.id!==gid) });
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
     { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
-
-  // 圃場ドラッグ
-  const groupRefs = useRef([]);
-  const { start: groupDragStart, dragIdx: groupDragIdx, overIdx: groupOverIdx } = useDrag(
-    area.groups,
-    (next) => setAreasWithHistory(prev => prev.map(a => a.id===area.id ? { ...a, groups: next } : a)),
-    () => groupRefs.current,
-    null
-  );
+  const moveGroup = (idx, dir) => {
+    onUpdate({ ...area, groups: moveItem(area.groups, idx, dir) });
+  };
 
   const lpTimer = useRef(null);
   const touchPos = useRef({ x:0, y:0 });
@@ -438,79 +361,58 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
   const nameMouseUp = () => clearTimeout(lpTimer.current);
   const nameClick = () => { if (!didLongPress.current) setEditOpen(true); };
 
-  // エリア名をドラッグハンドルとして使う
-  const namePointerDown = (e) => {
-    nameMouseDown(e);
-    onAreaDragStart(e);
-  };
-
   return (
     <div style={{ background: area.color+"bb", borderRadius:10, padding:8, border:`1px solid ${area.color}99` }}>
       <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
-        <span
-          onClick={nameClick}
-          onTouchStart={nameTouchStart}
-          onTouchEnd={nameTouchEnd}
-          onTouchMove={nameTouchEnd}
-          onPointerDown={namePointerDown}
-          onMouseUp={nameMouseUp}
-          onMouseLeave={nameMouseUp}
-          style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff", cursor:"grab", userSelect:"none", touchAction:"none" }}>
+        <span onClick={nameClick}
+          onTouchStart={nameTouchStart} onTouchEnd={nameTouchEnd} onTouchMove={nameTouchEnd}
+          onMouseDown={nameMouseDown} onMouseUp={nameMouseUp} onMouseLeave={nameMouseUp}
+          style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff", cursor:"pointer", userSelect:"none" }}>
           {area.name}
         </span>
         <span style={{ background:"#44444488", color:"#fff", borderRadius:"50%", width:16, height:16,
           fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
           {total}
         </span>
-          {area.groups.length === 1 && area.groups[0].name === null && (
+        {area.groups.length === 1 && area.groups[0].name === null && (
           <button onClick={e => { e.stopPropagation(); onAddTask(area.id, area.groups[0].id); }}
             style={{ background:"rgba(255,255,255,0.15)", border:"none", borderRadius:4, color:"#fff",
               cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
               alignItems:"center", justifyContent:"center" }}>+</button>
         )}
-        {/* 圃場追加＋ (常に表示) */}
         <button onClick={e => { e.stopPropagation(); addGroup(); }}
           style={{ background:"rgba(255,255,255,0.25)", border:"none", borderRadius:4, color:"#fff",
             cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
             alignItems:"center", justifyContent:"center" }}>🏡</button>
+        <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
       </div>
 
-      <div>
-        {area.groups.map((g, gi) => (
-          <div key={g.id} ref={el => groupRefs.current[gi] = el}
-            style={{
-              opacity: groupDragIdx === gi ? 0.4 : 1,
-              borderTop: groupOverIdx === gi && groupDragIdx !== gi ? "2px solid #f97316" : "2px solid transparent",
-            }}>
-            <Group group={g}
-              onChange={(updatedGroup) => setAreasWithHistory(prev => prev.map(a => a.id!==area.id ? a : {
-                ...a, groups: a.groups.map(x => x.id===updatedGroup.id ? updatedGroup : x)
-              }))}
-              onAddTask={() => onAddTask(area.id, g.id)}
-              onDelete={() => delGroup(g.id)}
-              onGroupDragStart={groupDragStart(gi)}
-            />
-          </div>
-        ))}
-      </div>
+      {area.groups.map((g, gi) => (
+        <Group key={g.id} group={g}
+          onChange={(updatedGroup) => setAreas(prev => prev.map(a => a.id!==area.id ? a : {
+            ...a, groups: a.groups.map(x => x.id===updatedGroup.id ? updatedGroup : x)
+          }))}
+          onAddTask={() => onAddTask(area.id, g.id)}
+          onDelete={() => delGroup(g.id)}
+          onMoveUp={() => moveGroup(gi, -1)}
+          onMoveDown={() => moveGroup(gi, 1)}
+          canUp={gi > 0}
+          canDown={gi < area.groups.length - 1}
+        />
+      ))}
 
       {menu && (
-        <ContextMenu
-          x={menu.x} y={menu.y}
+        <ContextMenu x={menu.x} y={menu.y}
           onEdit={() => setEditOpen(true)}
           onDelete={onDelete}
           onClose={() => setMenu(null)}
         />
       )}
       {editOpen && (
-        <EditModal
-          title="地区を編集"
-          initName={area.name}
-          initEmoji={area.emoji}
-          initColor={area.color}
-          showEmoji={true}
-          showColor={true}
-          onSave={({ name, emoji, color }) => { setAreasWithHistory(prev => prev.map(a => a.id===area.id ? { ...a, name, emoji, color } : a)); setEditOpen(false); }}
+        <EditModal title="地区を編集"
+          initName={area.name} initEmoji={area.emoji} initColor={area.color}
+          showEmoji={true} showColor={true}
+          onSave={({ name, emoji, color }) => { setAreas(prev => prev.map(a => a.id===area.id ? { ...a, name, emoji, color } : a)); setEditOpen(false); }}
           onClose={() => setEditOpen(false)}
         />
       )}
@@ -518,7 +420,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
   );
 }
 
-// localStorage helpers
+// localStorage
 const load = (key, fallback) => {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 };
@@ -526,20 +428,11 @@ const save = (key, val) => {
   try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 };
 
-// 全IDを強制的に新しいUUIDに置き換え（重複を完全排除）
-const migrateAreas = (areas) => {
-  return areas.map(a => ({
-    ...a,
-    id: nid(),
-    groups: a.groups.map(g => ({
-      ...g,
-      id: nid(),
-      tasks: g.tasks.map(t => ({ ...t, id: nid() }))
-    }))
-  }));
-};
+const migrateAreas = (areas) => areas.map(a => ({
+  ...a, id: nid(),
+  groups: a.groups.map(g => ({ ...g, id: nid(), tasks: g.tasks.map(t => ({ ...t, id: nid() })) }))
+}));
 
-// バージョン管理：v2未満のデータは全IDを再生成
 const loadAreas = () => {
   const ver = localStorage.getItem("dataVer");
   const raw = load("areas", INIT);
@@ -557,11 +450,10 @@ function App() {
   const [areas, setAreas] = useState(() => loadAreas());
   const [history, setHistory] = useState([]);
 
-  // setAreasをundo対応版にラップ
   const setAreasWithHistory = (updater) => {
     setAreas(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
-      setHistory(h => [...h.slice(-19), prev]); // 最大20履歴
+      setHistory(h => [...h.slice(-19), prev]);
       return next;
     });
   };
@@ -570,6 +462,7 @@ function App() {
     setAreas(history[history.length - 1]);
     setHistory(h => h.slice(0, -1));
   };
+
   const [modal, setModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("🌾");
@@ -578,20 +471,12 @@ function App() {
   const [toast, setToast] = useState(false);
   const colRef = useRef();
 
-  // areasが変わるたびに自動保存
   useEffect(() => { save("areas", areas); }, [areas]);
 
-  const upd = (a) => setAreasWithHistory(prev => prev.map(x => x.id===a.id ? a : x));
   const del = (id) => setAreasWithHistory(prev => prev.filter(x => x.id!==id));
-
-  // エリアドラッグ
-  const areaRefs = useRef([]);
-  const { start: areaDragStart, dragIdx: areaDragIdx, overIdx: areaOverIdx } = useDrag(
-    areas,
-    (next) => setAreasWithHistory(() => next),
-    () => areaRefs.current,
-    null
-  );
+  const moveArea = (idx, dir) => {
+    setAreasWithHistory(prev => moveItem(prev, idx, dir));
+  };
 
   const isFull = () => {
     const el = colRef.current;
@@ -628,8 +513,6 @@ function App() {
     setNewName(""); setNewEmoji("🌾"); setNewColor("#5b3d8f"); setModal(false);
   };
 
-  const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
-
   const [yearGoal, setYearGoal] = useState(() => load("yearGoal", "年間目標を入力…"));
   const [todayGoal, setTodayGoal] = useState(() => load("todayGoal", "今日の目標を入力…"));
   const [editYear, setEditYear] = useState(false);
@@ -637,38 +520,12 @@ function App() {
   const [logs, setLogs] = useState(() => load("logs", []));
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState("");
-  const [logDate, setLogDate] = useState("");
 
   useEffect(() => { save("yearGoal", yearGoal); }, [yearGoal]);
   useEffect(() => { save("todayGoal", todayGoal); }, [todayGoal]);
   useEffect(() => { save("logs", logs); }, [logs]);
 
-  const today = () => new Date().toLocaleDateString("ja-JP", { month:"numeric", day:"numeric", weekday:"short" });
-
-  // タスク完了時に自動ログ
-  const updWithLog = (updated) => {
-    upd(updated);
-    // 完了になったタスクを検出してログへ
-    const prev = areas.find(a => a.id === updated.id);
-    if (!prev) return;
-    updated.groups.forEach(ng => {
-      const og = prev.groups.find(g => g.id === ng.id);
-      if (!og) return;
-      ng.tasks.forEach(nt => {
-        const ot = og.tasks.find(t => t.id === nt.id);
-        if (ot && !ot.done && nt.done) {
-          const entry = {
-            id: nid(),
-            date: new Date().toLocaleDateString("ja-JP"),
-            time: new Date().toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit" }),
-            text: `✅ ${updated.name} › ${nt.text}`,
-            manual: false,
-          };
-          setLogs(prev => [entry, ...prev]);
-        }
-      });
-    });
-  };
+  const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
   return (
     <div style={{ height:"100vh", display:"flex", flexDirection:"column",
@@ -676,17 +533,14 @@ function App() {
       color:"#fff", overflow:"hidden" }}>
 
       <div style={{ padding:"8px 12px 6px", borderBottom:"1px solid #2a2a3a", flexShrink:0 }}>
-        {/* 1行目：年間目標 + バッジ + ボタン */}
         <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
           {editYear
             ? <input autoFocus value={yearGoal} onChange={e => setYearGoal(e.target.value)}
-                onBlur={() => setEditYear(false)}
-                onKeyDown={e => e.key==="Enter" && setEditYear(false)}
+                onBlur={() => setEditYear(false)} onKeyDown={e => e.key==="Enter" && setEditYear(false)}
                 style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
                   color:"#fff", fontSize:14, fontWeight:"bold", outline:"none" }} />
-            : <span onClick={() => setEditYear(true)}
-                style={{ flex:1, fontWeight:"bold", fontSize:14, color:"#fff", cursor:"text",
-                  opacity: yearGoal==="年間目標を入力…" ? 0.35 : 1 }}>
+            : <span onClick={() => setEditYear(true)} style={{ flex:1, fontWeight:"bold", fontSize:14,
+                color:"#fff", cursor:"text", opacity: yearGoal==="年間目標を入力…" ? 0.35 : 1 }}>
                 {yearGoal}
               </span>
           }
@@ -694,24 +548,21 @@ function App() {
             fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold", flexShrink:0 }}>
             {total}
           </span>
-          <button onClick={undo} disabled={history.length===0}
-            style={{ background:"#2a2a3a", border:"none", borderRadius:6,
-              color: history.length===0 ? "#444" : "#aaa", padding:"3px 8px", fontSize:10, cursor: history.length===0 ? "default" : "pointer", flexShrink:0 }}>↩️</button>
+          <button onClick={undo} disabled={history.length===0} style={{ background:"#2a2a3a", border:"none",
+            borderRadius:6, color: history.length===0 ? "#444" : "#aaa",
+            padding:"3px 8px", fontSize:10, cursor: history.length===0 ? "default" : "pointer", flexShrink:0 }}>↩️</button>
           <button onClick={() => setLogOpen(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
             color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>📋 ログ</button>
           <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
             color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>＋地区</button>
         </div>
-        {/* 2行目：今日の目標 */}
         {editToday
           ? <input autoFocus value={todayGoal} onChange={e => setTodayGoal(e.target.value)}
-              onBlur={() => setEditToday(false)}
-              onKeyDown={e => e.key==="Enter" && setEditToday(false)}
+              onBlur={() => setEditToday(false)} onKeyDown={e => e.key==="Enter" && setEditToday(false)}
               style={{ width:"100%", background:"transparent", border:"none", borderBottom:"1px solid #555",
                 color:"#aaa", fontSize:11, outline:"none", boxSizing:"border-box" }} />
-          : <span onClick={() => setEditToday(true)}
-              style={{ fontSize:11, color:"#888", cursor:"text",
-                opacity: todayGoal==="今日の目標を入力…" ? 0.5 : 1 }}>
+          : <span onClick={() => setEditToday(true)} style={{ fontSize:11, color:"#888", cursor:"text",
+              opacity: todayGoal==="今日の目標を入力…" ? 0.5 : 1 }}>
               📍 {todayGoal}
             </span>
         }
@@ -781,35 +632,31 @@ function App() {
           padding:8, overflow:"hidden", boxSizing:"border-box",
         }}>
           {areas.map((area, i) => (
-            <div key={area.id} ref={el => areaRefs.current[i] = el}
-              style={{
-                marginBottom: i < areas.length-1 ? 6 : 0, width:"100%",
-                opacity: areaDragIdx === i ? 0.4 : 1,
-                borderTop: areaOverIdx === i && areaDragIdx !== i ? "2px solid #60a5fa" : "2px solid transparent",
-              }}>
-              <AreaCard area={area} setAreas={setAreasWithHistory} onDelete={() => del(area.id)} onAddTask={addTask}
-                onAreaDragStart={areaDragStart(i)} />
+            <div key={area.id} style={{ marginBottom: i < areas.length-1 ? 6 : 0, width:"100%" }}>
+              <AreaCard area={area} setAreas={setAreasWithHistory} onDelete={() => del(area.id)}
+                onAddTask={addTask}
+                onMoveUp={() => moveArea(i, -1)}
+                onMoveDown={() => moveArea(i, 1)}
+                canUp={i > 0}
+                canDown={i < areas.length - 1}
+              />
             </div>
           ))}
         </div>
       </div>
 
-      {/* 作業ログモーダル */}
       {logOpen && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:300,
           display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
           <div style={{ background:"#1e1e30", borderRadius:"16px 16px 0 0", width:"100%",
             maxHeight:"80vh", display:"flex", flexDirection:"column", border:"1px solid #444" }}>
-            {/* ログヘッダー */}
-            <div style={{ display:"flex", alignItems:"center", padding:"12px 14px 8px",
-              borderBottom:"1px solid #2a2a3a" }}>
+            <div style={{ display:"flex", alignItems:"center", padding:"12px 14px 8px", borderBottom:"1px solid #2a2a3a" }}>
               <span style={{ fontWeight:"bold", fontSize:14, flex:1 }}>📋 作業ログ</span>
               <button onClick={() => setLogs([])} style={{ background:"transparent", border:"none",
                 color:"#666", fontSize:11, cursor:"pointer", marginRight:10 }}>全削除</button>
               <button onClick={() => setLogOpen(false)} style={{ background:"transparent", border:"none",
                 color:"#aaa", fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>
             </div>
-            {/* 手動ログ入力 */}
             <div style={{ display:"flex", gap:6, padding:"8px 12px", borderBottom:"1px solid #2a2a3a" }}>
               <input value={logText} onChange={e => setLogText(e.target.value)}
                 placeholder="作業メモを入力…"
@@ -834,30 +681,21 @@ function App() {
               }} style={{ background:"#5b3d8f", border:"none", borderRadius:7, color:"#fff",
                 padding:"6px 12px", cursor:"pointer", fontSize:12 }}>追加</button>
             </div>
-            {/* ログ一覧 — 日付でグループ */}
             <div style={{ overflowY:"auto", flex:1, padding:"8px 12px" }}>
               {logs.length === 0
                 ? <div style={{ color:"#555", fontSize:12, textAlign:"center", marginTop:20 }}>ログがありません</div>
                 : (() => {
-                    // 日付ごとにグループ化
                     const grouped = {};
-                    logs.forEach(l => {
-                      if (!grouped[l.date]) grouped[l.date] = [];
-                      grouped[l.date].push(l);
-                    });
+                    logs.forEach(l => { if (!grouped[l.date]) grouped[l.date] = []; grouped[l.date].push(l); });
                     return Object.entries(grouped).map(([date, items]) => (
                       <div key={date} style={{ marginBottom:12 }}>
                         <div style={{ fontSize:10, color:"#888", fontWeight:"bold",
-                          marginBottom:4, borderBottom:"1px solid #2a2a3a", paddingBottom:2 }}>
-                          {date}
-                        </div>
+                          marginBottom:4, borderBottom:"1px solid #2a2a3a", paddingBottom:2 }}>{date}</div>
                         {items.map(l => (
                           <div key={l.id} style={{ display:"flex", alignItems:"flex-start", gap:8,
                             padding:"5px 0", borderBottom:"1px solid #1e1e2a" }}>
                             <span style={{ fontSize:10, color:"#666", flexShrink:0, marginTop:1 }}>{l.time}</span>
-                            <span style={{ fontSize:12, color: l.manual?"#ddd":"#aaa", flex:1, lineHeight:1.4 }}>
-                              {l.text}
-                            </span>
+                            <span style={{ fontSize:12, color: l.manual?"#ddd":"#aaa", flex:1, lineHeight:1.4 }}>{l.text}</span>
                             <button onClick={() => setLogs(prev => prev.filter(x => x.id!==l.id))}
                               style={{ background:"transparent", border:"none", color:"#444",
                                 cursor:"pointer", fontSize:11, flexShrink:0 }}>×</button>
