@@ -758,7 +758,7 @@ function App() {
           height:"100%", columnCount:2, columnGap:8, columnFill:"auto",
           columnRuleWidth:"2px", columnRuleStyle:"dashed", columnRuleColor:"#3a3a5a",
           padding:8, overflow:"hidden", boxSizing:"border-box",
-        }} onPointerMove={onAreaPointerMove} onPointerUp={onAreaPointerUp}>
+        }}>
           {areas.map((area, i) => (
             <div key={area.id} ref={el => areaRefs.current[i] = el}
               style={{
@@ -767,7 +767,7 @@ function App() {
                 borderTop: areaOverIdx === i && areaDragIdx !== i ? "2px solid #60a5fa" : "2px solid transparent",
               }}>
               <AreaCard area={area} setAreas={setAreasWithHistory} onDelete={() => del(area.id)} onAddTask={addTask}
-                onAreaDragStart={onAreaPointerDown(i)} />
+                onAreaDragStart={areaDragStart(i)} />
             </div>
           ))}
         </div>
