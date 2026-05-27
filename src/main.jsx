@@ -193,9 +193,9 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
         color:"#555", fontSize:14, cursor:"grab", flexShrink:0,
         touchAction:"none", padding:"0 2px", lineHeight:1
       }}>⠿</span>
-      <button onClick={() => onChange({ ...task, done:!task.done })}
+      <button onClick={() => onDelete(task)}
         style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
-          background: task.done ? c : "transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
+          background:"transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
       {editing
         ? <input autoFocus value={v} onChange={e => setV(e.target.value)}
             onBlur={() => { onChange({ ...task, text:v }); setEditing(false); }}
@@ -240,7 +240,9 @@ function Group({ group, onChange, onAddTask, onDelete }) {
   const updTask = (updated) => {
     onChange({ ...group, tasks: sortByPri(group.tasks.map(t => t.id===updated.id ? updated : t)) });
   };
-  const delTask = (id) => onChange({ ...group, tasks: group.tasks.filter(t => t.id!==id) });
+  const delTask = (task) => {
+    onChange({ ...group, tasks: group.tasks.filter(t => t.id!==task.id) });
+  };
 
   const getOverIdx = (clientY) => {
     let found = null;
@@ -313,7 +315,7 @@ function Group({ group, onChange, onAddTask, onDelete }) {
           }}>
           <Task task={t}
             onChange={updTask}
-            onDelete={() => delTask(t.id)}
+            onDelete={(task) => delTask(task)}
             dragHandlers={{ onPointerDown: onPointerDown(i) }}
           />
         </div>
@@ -354,6 +356,43 @@ function AreaCard({ area, setAreas, onDelete, onAddTask }) {
   const delGroup = (gid) => onUpdate({ ...area, groups: area.groups.filter(g => g.id!==gid) });
   const addGroup = () => onUpdate({ ...area, groups:[...area.groups,
     { id:nid(), name:`圃場${area.groups.length+1}`, tasks:[] }] });
+
+  // 圃場ドラッグ
+  const groupRefs = useRef([]);
+  const groupDragState = useRef(null);
+  const [groupDragIdx, setGroupDragIdx] = useState(null);
+  const [groupOverIdx, setGroupOverIdx] = useState(null);
+
+  const onGroupPointerDown = (idx) => (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    groupDragState.current = { idx };
+    setGroupDragIdx(idx);
+  };
+  const onGroupPointerMove = (e) => {
+    if (!groupDragState.current) return;
+    let found = null;
+    groupRefs.current.forEach((ref, i) => {
+      if (!ref) return;
+      const rect = ref.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) found = i;
+    });
+    if (found !== null) setGroupOverIdx(found);
+  };
+  const onGroupPointerUp = () => {
+    if (groupDragState.current && groupOverIdx !== null) {
+      const from = groupDragState.current.idx;
+      const to = groupOverIdx;
+      if (from !== to) {
+        const groups = [...area.groups];
+        groups.splice(from, 1);
+        groups.splice(to, 0, area.groups[from]);
+        onUpdate({ ...area, groups });
+      }
+    }
+    groupDragState.current = null;
+    setGroupDragIdx(null);
+    setGroupOverIdx(null);
+  };
 
   const lpTimer = useRef(null);
   const touchPos = useRef({ x:0, y:0 });
@@ -411,15 +450,29 @@ function AreaCard({ area, setAreas, onDelete, onAddTask }) {
             alignItems:"center", justifyContent:"center" }}>🏡</button>
       </div>
 
-      {area.groups.map(g => (
-        <Group key={g.id} group={g}
-          onChange={(updatedGroup) => setAreas(prev => prev.map(a => a.id!==area.id ? a : {
-            ...a, groups: a.groups.map(x => x.id===updatedGroup.id ? updatedGroup : x)
-          }))}
-          onAddTask={() => onAddTask(area.id, g.id)}
-          onDelete={() => delGroup(g.id)}
-        />
-      ))}
+      <div onPointerMove={onGroupPointerMove} onPointerUp={onGroupPointerUp}>
+        {area.groups.map((g, gi) => (
+          <div key={g.id} ref={el => groupRefs.current[gi] = el}
+            style={{
+              opacity: groupDragIdx === gi ? 0.4 : 1,
+              borderTop: groupOverIdx === gi && groupDragIdx !== gi ? "2px solid #f97316" : "2px solid transparent",
+            }}>
+            {/* 圃場名がある場合のみドラッグハンドル表示 */}
+            {g.name && (
+              <span onPointerDown={onGroupPointerDown(gi)}
+                style={{ color:"#555", fontSize:12, cursor:"grab", touchAction:"none",
+                  display:"inline-block", marginRight:4, userSelect:"none" }}>⠿</span>
+            )}
+            <Group key={g.id} group={g}
+              onChange={(updatedGroup) => setAreas(prev => prev.map(a => a.id!==area.id ? a : {
+                ...a, groups: a.groups.map(x => x.id===updatedGroup.id ? updatedGroup : x)
+              }))}
+              onAddTask={() => onAddTask(area.id, g.id)}
+              onDelete={() => delGroup(g.id)}
+            />
+          </div>
+        ))}
+      </div>
 
       {menu && (
         <ContextMenu
@@ -437,7 +490,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask }) {
           initColor={area.color}
           showEmoji={true}
           showColor={true}
-          onSave={({ name, emoji, color }) => { onUpdate({ ...area, name, emoji, color }); setEditOpen(false); }}
+          onSave={({ name, emoji, color }) => { setAreas(prev => prev.map(a => a.id===area.id ? { ...a, name, emoji, color } : a)); setEditOpen(false); }}
           onClose={() => setEditOpen(false)}
         />
       )}
@@ -495,6 +548,45 @@ function App() {
 
   const upd = (a) => setAreas(prev => prev.map(x => x.id===a.id ? a : x));
   const del = (id) => setAreas(prev => prev.filter(x => x.id!==id));
+
+  // エリアドラッグ
+  const areaRefs = useRef([]);
+  const areaDragState = useRef(null);
+  const [areaDragIdx, setAreaDragIdx] = useState(null);
+  const [areaOverIdx, setAreaOverIdx] = useState(null);
+
+  const onAreaPointerDown = (idx) => (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    areaDragState.current = { idx };
+    setAreaDragIdx(idx);
+  };
+  const onAreaPointerMove = (e) => {
+    if (!areaDragState.current) return;
+    let found = null;
+    areaRefs.current.forEach((ref, i) => {
+      if (!ref) return;
+      const rect = ref.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) found = i;
+    });
+    if (found !== null) setAreaOverIdx(found);
+  };
+  const onAreaPointerUp = () => {
+    if (areaDragState.current && areaOverIdx !== null) {
+      const from = areaDragState.current.idx;
+      const to = areaOverIdx;
+      if (from !== to) {
+        setAreas(prev => {
+          const next = [...prev];
+          next.splice(from, 1);
+          next.splice(to, 0, prev[from]);
+          return next;
+        });
+      }
+    }
+    areaDragState.current = null;
+    setAreaDragIdx(null);
+    setAreaOverIdx(null);
+  };
 
   const isFull = () => {
     const el = colRef.current;
@@ -599,8 +691,6 @@ function App() {
           </span>
           <button onClick={() => setLogOpen(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
             color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>📋 ログ</button>
-          <button style={{ background:"#2a2a3a", border:"none", borderRadius:6,
-            color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>完了▼</button>
           <button onClick={() => setModal(true)} style={{ background:"#2a2a3a", border:"none", borderRadius:6,
             color:"#aaa", padding:"3px 8px", fontSize:10, cursor:"pointer", flexShrink:0 }}>＋地区</button>
         </div>
@@ -681,9 +771,20 @@ function App() {
           height:"100%", columnCount:2, columnGap:8, columnFill:"auto",
           columnRuleWidth:"2px", columnRuleStyle:"dashed", columnRuleColor:"#3a3a5a",
           padding:8, overflow:"hidden", boxSizing:"border-box",
-        }}>
+        }} onPointerMove={onAreaPointerMove} onPointerUp={onAreaPointerUp}>
           {areas.map((area, i) => (
-            <div key={area.id} style={{ marginBottom: i < areas.length-1 ? 6 : 0, width:"100%" }}>
+            <div key={area.id} ref={el => areaRefs.current[i] = el}
+              style={{
+                marginBottom: i < areas.length-1 ? 6 : 0, width:"100%",
+                opacity: areaDragIdx === i ? 0.4 : 1,
+                borderTop: areaOverIdx === i && areaDragIdx !== i ? "2px solid #60a5fa" : "2px solid transparent",
+              }}>
+              {/* エリアドラッグハンドル */}
+              <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:2 }}>
+                <span onPointerDown={onAreaPointerDown(i)}
+                  style={{ color:"#444", fontSize:12, cursor:"grab", touchAction:"none",
+                    userSelect:"none", padding:"0 2px" }}>⠿⠿</span>
+              </div>
               <AreaCard area={area} setAreas={setAreas} onDelete={() => del(area.id)} onAddTask={addTask} />
             </div>
           ))}
