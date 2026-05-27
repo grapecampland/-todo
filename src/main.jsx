@@ -66,8 +66,68 @@ const sortByPri = (tasks) => {
   return [...tasks].sort((a,b) => order[a.pri] - order[b.pri]);
 };
 
-// 長押し検出フック
-function useLongPress(callback, ms=500) {
+// ===== グローバルドラッグシステム =====
+// タスク・圃場・エリア全て共通で使う
+const useDrag = (items, onReorder, getItemEl, sameCheck) => {
+  const dragState = useRef(null);
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+
+  const findIdx = (y) => {
+    let found = null;
+    const els = getItemEl();
+    els.forEach((el, i) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) found = i;
+    });
+    return found;
+  };
+
+  const start = (idx) => (e) => {
+    e.stopPropagation();
+    dragState.current = { idx };
+    setDragIdx(idx);
+
+    const move = (ev) => {
+      const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
+      const over = findIdx(y);
+      if (over !== null) setOverIdx(over);
+    };
+    const end = (ev) => {
+      const y = ev.changedTouches ? ev.changedTouches[0].clientY : ev.clientY;
+      const toIdx = findIdx(y) ?? dragState.current?.overIdx;
+      const fromIdx = dragState.current?.idx;
+      if (fromIdx != null && toIdx != null && fromIdx !== toIdx) {
+        const from = items[fromIdx];
+        const to   = items[toIdx];
+        if (!sameCheck || sameCheck(from, to)) {
+          const next = [...items];
+          next.splice(fromIdx, 1);
+          next.splice(toIdx, 0, from);
+          onReorder(next);
+        }
+      }
+      dragState.current = null;
+      setDragIdx(null);
+      setOverIdx(null);
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", end);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", end);
+    };
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", end);
+    document.addEventListener("touchmove", move, { passive:true });
+    document.addEventListener("touchend", end);
+  };
+
+  useEffect(() => () => {
+    dragState.current = null;
+  }, []);
+
+  return { start, dragIdx, overIdx };
+};
   const timer = useRef(null);
   const start = (e) => {
     e.preventDefault();
@@ -225,10 +285,9 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
 function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
-  const [overIdx, setOverIdx] = useState(null);
+  const [dragIdx, setDragIdx_] = useState(null);
+  const [overIdx, setOverIdx_] = useState(null);
   const taskRefs = useRef([]);
-  const dragState = useRef(null);
 
   const lp = useLongPress((e) => {
     setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
@@ -241,49 +300,15 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
     onChange({ ...group, tasks: group.tasks.filter(t => t.id!==task.id) });
   };
 
-  const getOverIdx = (clientY) => {
-    let found = null;
-    taskRefs.current.forEach((ref, i) => {
-      if (!ref) return;
-      const rect = ref.getBoundingClientRect();
-      if (clientY >= rect.top && clientY <= rect.bottom) found = i;
-    });
-    return found;
-  };
-
-  const onPointerDown = (idx) => (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragState.current = { idx };
-    setDragIdx(idx);
-  };
-
-  const onPointerMove = (e) => {
-    if (!dragState.current) return;
-    const over = getOverIdx(e.clientY);
-    if (over !== null) setOverIdx(over);
-  };
-
-  const onPointerUp = (e) => {
-    if (!dragState.current) return;
-    const fromIdx = dragState.current.idx;
-    const toIdx = overIdx;
-    if (toIdx !== null && fromIdx !== toIdx) {
-      const from = group.tasks[fromIdx];
-      const to   = group.tasks[toIdx];
-      if (from.pri === to.pri) {
-        const tasks = [...group.tasks];
-        tasks.splice(fromIdx, 1);
-        tasks.splice(toIdx, 0, from);
-        onChange({ ...group, tasks });
-      }
-    }
-    dragState.current = null;
-    setDragIdx(null);
-    setOverIdx(null);
-  };
+  const { start: taskDragStart, dragIdx, overIdx } = useDrag(
+    group.tasks,
+    (next) => onChange({ ...group, tasks: next }),
+    () => taskRefs.current,
+    (a, b) => a.pri === b.pri
+  );
 
   return (
-    <div style={{ marginBottom:4 }} onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <div style={{ marginBottom:4 }}>
       {group.name && (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
           <span
@@ -314,7 +339,10 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
           <Task task={t}
             onChange={updTask}
             onDelete={(task) => delTask(task)}
-            dragHandlers={{ onPointerDown: onPointerDown(i) }}
+            dragHandlers={{
+              onMouseDown: taskDragStart(i),
+              onTouchStart: taskDragStart(i),
+            }}
           />
         </div>
       ))}
@@ -357,40 +385,12 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
 
   // 圃場ドラッグ
   const groupRefs = useRef([]);
-  const groupDragState = useRef(null);
-  const [groupDragIdx, setGroupDragIdx] = useState(null);
-  const [groupOverIdx, setGroupOverIdx] = useState(null);
-
-  const onGroupPointerDown = (idx) => (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    groupDragState.current = { idx };
-    setGroupDragIdx(idx);
-  };
-  const onGroupPointerMove = (e) => {
-    if (!groupDragState.current) return;
-    let found = null;
-    groupRefs.current.forEach((ref, i) => {
-      if (!ref) return;
-      const rect = ref.getBoundingClientRect();
-      if (e.clientY >= rect.top && e.clientY <= rect.bottom) found = i;
-    });
-    if (found !== null) setGroupOverIdx(found);
-  };
-  const onGroupPointerUp = () => {
-    if (groupDragState.current && groupOverIdx !== null) {
-      const from = groupDragState.current.idx;
-      const to = groupOverIdx;
-      if (from !== to) {
-        const groups = [...area.groups];
-        groups.splice(from, 1);
-        groups.splice(to, 0, area.groups[from]);
-        onUpdate({ ...area, groups });
-      }
-    }
-    groupDragState.current = null;
-    setGroupDragIdx(null);
-    setGroupOverIdx(null);
-  };
+  const { start: groupDragStart, dragIdx: groupDragIdx, overIdx: groupOverIdx } = useDrag(
+    area.groups,
+    (next) => setAreasWithHistory(prev => prev.map(a => a.id===area.id ? { ...a, groups: next } : a)),
+    () => groupRefs.current,
+    null
+  );
 
   const lpTimer = useRef(null);
   const touchPos = useRef({ x:0, y:0 });
@@ -454,7 +454,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
             alignItems:"center", justifyContent:"center" }}>🏡</button>
       </div>
 
-      <div onPointerMove={onGroupPointerMove} onPointerUp={onGroupPointerUp}>
+      <div>
         {area.groups.map((g, gi) => (
           <div key={g.id} ref={el => groupRefs.current[gi] = el}
             style={{
@@ -467,7 +467,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart }) {
               }))}
               onAddTask={() => onAddTask(area.id, g.id)}
               onDelete={() => delGroup(g.id)}
-              onGroupDragStart={onGroupPointerDown(gi)}
+              onGroupDragStart={groupDragStart(gi)}
             />
           </div>
         ))}
@@ -565,42 +565,12 @@ function App() {
 
   // エリアドラッグ
   const areaRefs = useRef([]);
-  const areaDragState = useRef(null);
-  const [areaDragIdx, setAreaDragIdx] = useState(null);
-  const [areaOverIdx, setAreaOverIdx] = useState(null);
-
-  const onAreaPointerDown = (idx) => (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    areaDragState.current = { idx };
-    setAreaDragIdx(idx);
-  };
-  const onAreaPointerMove = (e) => {
-    if (!areaDragState.current) return;
-    let found = null;
-    areaRefs.current.forEach((ref, i) => {
-      if (!ref) return;
-      const rect = ref.getBoundingClientRect();
-      if (e.clientY >= rect.top && e.clientY <= rect.bottom) found = i;
-    });
-    if (found !== null) setAreaOverIdx(found);
-  };
-  const onAreaPointerUp = () => {
-    if (areaDragState.current && areaOverIdx !== null) {
-      const from = areaDragState.current.idx;
-      const to = areaOverIdx;
-      if (from !== to) {
-        setAreasWithHistory(prev => {
-          const next = [...prev];
-          next.splice(from, 1);
-          next.splice(to, 0, prev[from]);
-          return next;
-        });
-      }
-    }
-    areaDragState.current = null;
-    setAreaDragIdx(null);
-    setAreaOverIdx(null);
-  };
+  const { start: areaDragStart, dragIdx: areaDragIdx, overIdx: areaOverIdx } = useDrag(
+    areas,
+    (next) => setAreasWithHistory(() => next),
+    () => areaRefs.current,
+    null
+  );
 
   const isFull = () => {
     const el = colRef.current;
