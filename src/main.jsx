@@ -67,64 +67,63 @@ const sortByPri = (tasks) => {
 };
 
 // ===== グローバルドラッグシステム =====
-// タスク・圃場・エリア全て共通で使う
 const useDrag = (items, onReorder, getItemEl, sameCheck) => {
-  const dragState = useRef(null);
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
-
-  const findIdx = (y) => {
-    let found = null;
-    const els = getItemEl();
-    els.forEach((el, i) => {
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (y >= r.top && y <= r.bottom) found = i;
-    });
-    return found;
-  };
+  const overIdxRef = useRef(null); // stateを使わずrefで追跡
 
   const start = (idx) => (e) => {
     e.stopPropagation();
-    dragState.current = { idx };
     setDragIdx(idx);
+    overIdxRef.current = null;
+
+    const getY = (ev) => ev.touches ? ev.touches[0].clientY : ev.clientY;
+
+    const findOver = (y) => {
+      const els = getItemEl();
+      let found = null;
+      els.forEach((el, i) => {
+        if (!el || i === idx) return;
+        const r = el.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) found = i;
+      });
+      return found;
+    };
 
     const move = (ev) => {
-      const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
-      const over = findIdx(y);
-      if (over !== null) setOverIdx(over);
+      const over = findOver(getY(ev));
+      if (over !== null && over !== overIdxRef.current) {
+        overIdxRef.current = over;
+        setOverIdx(over);
+      }
     };
+
     const end = (ev) => {
-      const y = ev.changedTouches ? ev.changedTouches[0].clientY : ev.clientY;
-      const toIdx = findIdx(y) ?? dragState.current?.overIdx;
-      const fromIdx = dragState.current?.idx;
-      if (fromIdx != null && toIdx != null && fromIdx !== toIdx) {
-        const from = items[fromIdx];
+      const toIdx = overIdxRef.current;
+      if (toIdx !== null && toIdx !== idx) {
+        const from = items[idx];
         const to   = items[toIdx];
         if (!sameCheck || sameCheck(from, to)) {
           const next = [...items];
-          next.splice(fromIdx, 1);
+          next.splice(idx, 1);
           next.splice(toIdx, 0, from);
           onReorder(next);
         }
       }
-      dragState.current = null;
       setDragIdx(null);
       setOverIdx(null);
+      overIdxRef.current = null;
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", end);
       document.removeEventListener("touchmove", move);
       document.removeEventListener("touchend", end);
     };
+
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", end);
-    document.addEventListener("touchmove", move, { passive:true });
+    document.addEventListener("touchmove", move, { passive: true });
     document.addEventListener("touchend", end);
   };
-
-  useEffect(() => () => {
-    dragState.current = null;
-  }, []);
 
   return { start, dragIdx, overIdx };
 };
