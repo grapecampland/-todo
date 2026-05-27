@@ -67,38 +67,41 @@ const sortByPri = (tasks) => {
 };
 
 // ===== グローバルドラッグシステム =====
+// 専用ハンドルをタッチダウンした瞬間からドラッグ開始
 const useDrag = (items, onReorder, getItemEl, sameCheck) => {
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
-  const overIdxRef = useRef(null); // stateを使わずrefで追跡
+  const overIdxRef = useRef(null);
+
+  const findOver = (y, excludeIdx) => {
+    const els = getItemEl();
+    let found = null;
+    els.forEach((el, i) => {
+      if (!el || i === excludeIdx) return;
+      const r = el.getBoundingClientRect();
+      if (y >= r.top && y <= r.bottom) found = i;
+    });
+    return found;
+  };
 
   const start = (idx) => (e) => {
+    e.preventDefault();
     e.stopPropagation();
     setDragIdx(idx);
     overIdxRef.current = null;
 
     const getY = (ev) => ev.touches ? ev.touches[0].clientY : ev.clientY;
 
-    const findOver = (y) => {
-      const els = getItemEl();
-      let found = null;
-      els.forEach((el, i) => {
-        if (!el || i === idx) return;
-        const r = el.getBoundingClientRect();
-        if (y >= r.top && y <= r.bottom) found = i;
-      });
-      return found;
-    };
-
     const move = (ev) => {
-      const over = findOver(getY(ev));
+      ev.preventDefault();
+      const over = findOver(getY(ev), idx);
       if (over !== null && over !== overIdxRef.current) {
         overIdxRef.current = over;
         setOverIdx(over);
       }
     };
 
-    const end = (ev) => {
+    const end = () => {
       const toIdx = overIdxRef.current;
       if (toIdx !== null && toIdx !== idx) {
         const from = items[idx];
@@ -119,13 +122,21 @@ const useDrag = (items, onReorder, getItemEl, sameCheck) => {
       document.removeEventListener("touchend", end);
     };
 
-    document.addEventListener("mousemove", move);
+    document.addEventListener("mousemove", move, { passive: false });
     document.addEventListener("mouseup", end);
-    document.addEventListener("touchmove", move, { passive: true });
+    document.addEventListener("touchmove", move, { passive: false });
     document.addEventListener("touchend", end);
   };
 
-  return { start, dragIdx, overIdx };
+  // ハンドルボタンのスタイル
+  const handleStyle = {
+    background: "transparent", border: "none",
+    color: "#666", fontSize: 14, cursor: "grab",
+    padding: "0 4px", touchAction: "none",
+    userSelect: "none", flexShrink: 0, lineHeight: 1,
+  };
+
+  return { start, dragIdx, overIdx, handleStyle };
 };
   const timer = useRef(null);
   const start = (e) => {
@@ -248,6 +259,12 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
   return (
     <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 6px",
       background:"rgba(255,255,255,0.04)", borderRadius:6, marginBottom:2, userSelect:"none" }}>
+      {/* ドラッグハンドル */}
+      <button {...dragHandlers} style={{
+        background:"transparent", border:"none", color:"#555", fontSize:13,
+        cursor:"grab", padding:"0 2px", touchAction:"none", userSelect:"none",
+        flexShrink:0, lineHeight:1,
+      }}>☰</button>
       <button onClick={() => onDelete(task)}
         style={{ width:16, height:16, borderRadius:"50%", border:`2px solid ${c}`,
           background:"transparent", cursor:"pointer", padding:0, flexShrink:0 }} />
@@ -257,10 +274,8 @@ function Task({ task, onChange, onDelete, dragHandlers }) {
             onKeyDown={e => e.key==="Enter" && e.target.blur()}
             style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
               color:"#fff", fontSize:11, outline:"none" }} />
-        : <span
-            onClick={() => setEditing(true)}
-            {...dragHandlers}
-            style={{ flex:1, fontSize:11, color:"#ddd", lineHeight:1.3, cursor:"grab", touchAction:"none", userSelect:"none" }}>
+        : <span onClick={() => setEditing(true)}
+            style={{ flex:1, fontSize:11, color:"#ddd", lineHeight:1.3, cursor:"text" }}>
             {task.text}
           </span>
       }
@@ -313,8 +328,7 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
           <span
             {...lp}
             onTouchStart={(e) => { lp.onTouchStart(e); }}
-            onPointerDown={onGroupDragStart}
-            style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"grab", userSelect:"none", flex:1, touchAction:"none" }}>
+            style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"text", userSelect:"none", flex:1 }}>
             {group.name}
           </span>
           <div style={{ display:"flex", gap:3, alignItems:"center" }}>
@@ -325,6 +339,14 @@ function Group({ group, onChange, onAddTask, onDelete, onGroupDragStart }) {
             <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
               borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
               display:"flex", alignItems:"center", justifyContent:"center" }}>＋</button>
+            {/* 圃場ドラッグハンドル */}
+            <button
+              onMouseDown={onGroupDragStart}
+              onTouchStart={onGroupDragStart}
+              style={{ background:"transparent", border:"none", color:"#666", fontSize:13,
+                cursor:"grab", padding:"0 2px", touchAction:"none", userSelect:"none", lineHeight:1 }}>
+              ☰
+            </button>
           </div>
         </div>
       )}
