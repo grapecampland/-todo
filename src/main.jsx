@@ -189,22 +189,37 @@ function EditModal({ title, initName, initEmoji, initColor, showEmoji, showColor
   );
 }
 
-// ↑↓ 並び替えボタン
-function MoveButtons({ onUp, onDown, canUp, canDown }) {
-  const btn = (label, onClick, enabled) => (
-    <button onClick={onClick} disabled={!enabled} style={{
-      background: enabled ? "rgba(255,255,255,0.15)" : "transparent",
-      border:"none", borderRadius:3, color: enabled ? "#ccc" : "#444",
-      cursor: enabled ? "pointer" : "default",
-      width:16, height:16, fontSize:10, display:"flex",
-      alignItems:"center", justifyContent:"center", padding:0, flexShrink:0,
-    }}>{label}</button>
-  );
+// アクションポップアップメニュー（移動＋編集＋削除）
+function MoveMenu({ x, y, canUp, canDown, onUp, onDown, onEdit, onDelete, onClose }) {
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
-      {btn("▲", onUp, canUp)}
-      {btn("▼", onDown, canDown)}
-    </div>
+    <>
+      <div onClick={onClose} style={{ position:"fixed", inset:0, zIndex:900 }} />
+      <div style={{
+        position:"fixed", left: Math.min(x, window.innerWidth - 130), top: Math.min(y, window.innerHeight - 200),
+        zIndex:1000, background:"#2a2a3a", border:"1px solid #555",
+        borderRadius:10, overflow:"hidden", boxShadow:"0 4px 20px rgba(0,0,0,0.8)", minWidth:130,
+      }}>
+        {onEdit && <button onClick={() => { onEdit(); onClose(); }} style={{
+          display:"block", width:"100%", padding:"10px 16px", background:"transparent",
+          border:"none", color:"#fff", cursor:"pointer", textAlign:"left", fontSize:13,
+          borderBottom:"1px solid #3a3a4a"
+        }}>✏️ 編集</button>}
+        <button onClick={() => { if(canUp) { onUp(); onClose(); } }} style={{
+          display:"block", width:"100%", padding:"10px 16px", background:"transparent",
+          border:"none", color: canUp ? "#fff" : "#555", cursor: canUp ? "pointer" : "default",
+          textAlign:"left", fontSize:13, borderBottom:"1px solid #3a3a4a"
+        }}>↑ 上に移動</button>
+        <button onClick={() => { if(canDown) { onDown(); onClose(); } }} style={{
+          display:"block", width:"100%", padding:"10px 16px", background:"transparent",
+          border:"none", color: canDown ? "#fff" : "#555", cursor: canDown ? "pointer" : "default",
+          textAlign:"left", fontSize:13, borderBottom: onDelete ? "1px solid #3a3a4a" : "none"
+        }}>↓ 下に移動</button>
+        {onDelete && <button onClick={() => { onDelete(); onClose(); }} style={{
+          display:"block", width:"100%", padding:"10px 16px", background:"transparent",
+          border:"none", color:"#ef4444", cursor:"pointer", textAlign:"left", fontSize:13,
+        }}>🗑️ 削除</button>}
+      </div>
+    </>
   );
 }
 
@@ -212,7 +227,12 @@ function MoveButtons({ onUp, onDown, canUp, canDown }) {
 function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(task.text);
+  const [moveMenu, setMoveMenu] = useState(null);
   const c = P_COLOR[task.pri];
+
+  const lp = useLongPress((e) => {
+    setMoveMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
+  });
 
   return (
     <div style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 6px",
@@ -227,7 +247,9 @@ function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }
             style={{ flex:1, background:"transparent", border:"none", borderBottom:"1px solid #aaa",
               color:"#fff", fontSize:11, outline:"none" }} />
         : <span onClick={() => setEditing(true)}
-            style={{ flex:1, fontSize:11, color:"#ddd", lineHeight:1.3, cursor:"text" }}>
+            {...lp}
+            onTouchStart={(e) => { lp.onTouchStart(e); }}
+            style={{ flex:1, fontSize:11, color:"#ddd", lineHeight:1.3, cursor:"text", userSelect:"none" }}>
             {task.text}
           </span>
       }
@@ -238,11 +260,16 @@ function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }
           border:"none", cursor:"pointer", padding:"1px 2px", flexShrink:0 }}>
         {task.pri}
       </button>
-      <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
       <button onClick={() => onDelete(task)}
         style={{ color:"#555", background:"transparent", border:"none", cursor:"pointer", fontSize:11, flexShrink:0 }}>
         ×
       </button>
+      {moveMenu && (
+        <MoveMenu x={moveMenu.x} y={moveMenu.y}
+          canUp={canUp} canDown={canDown}
+          onUp={onMoveUp} onDown={onMoveDown}
+          onClose={() => setMoveMenu(null)} />
+      )}
     </div>
   );
 }
@@ -251,6 +278,7 @@ function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }
 function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(null);
 
   const lp = useLongPress((e) => {
     setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
@@ -276,8 +304,12 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
       {group.name && (
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:3 }}>
           <span
-            {...lp}
             onTouchStart={(e) => { lp.onTouchStart(e); }}
+            onTouchEnd={lp.onTouchEnd}
+            onTouchMove={lp.onTouchMove}
+            onMouseDown={lp.onMouseDown}
+            onMouseUp={lp.onMouseUp}
+            onMouseLeave={lp.onMouseLeave}
             style={{ fontSize:10, fontWeight:"bold", color:"#bbb", cursor:"context-menu", userSelect:"none", flex:1 }}>
             {group.name}
           </span>
@@ -289,8 +321,13 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
             <button onClick={onAddTask} style={{ background:"rgba(255,255,255,0.1)", border:"none",
               borderRadius:3, color:"#aaa", cursor:"pointer", width:15, height:15, fontSize:11,
               display:"flex", alignItems:"center", justifyContent:"center" }}>＋</button>
-            <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
           </div>
+          {moveMenu && (
+            <MoveMenu x={moveMenu.x} y={moveMenu.y}
+              canUp={canUp} canDown={canDown}
+              onUp={onMoveUp} onDown={onMoveDown}
+              onClose={() => setMoveMenu(null)} />
+          )}
         </div>
       )}
       {group.tasks.map((t, i) => (
@@ -326,6 +363,7 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
 function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(null);
 
   const onUpdate = (updated) => setAreas(prev => prev.map(a => a.id===updated.id ? updated : a));
   const total = area.groups.reduce((s,g) => s + g.tasks.filter(t=>!t.done).length, 0);
@@ -346,7 +384,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMove
     touchPos.current = { x: t.clientX, y: t.clientY };
     lpTimer.current = setTimeout(() => {
       didLongPress.current = true;
-      setMenu({ x: touchPos.current.x, y: touchPos.current.y });
+      setMoveMenu({ x: touchPos.current.x, y: touchPos.current.y });
     }, 500);
   };
   const nameTouchEnd = () => clearTimeout(lpTimer.current);
@@ -355,7 +393,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMove
     touchPos.current = { x: e.clientX, y: e.clientY };
     lpTimer.current = setTimeout(() => {
       didLongPress.current = true;
-      setMenu({ x: touchPos.current.x, y: touchPos.current.y });
+      setMoveMenu({ x: touchPos.current.x, y: touchPos.current.y });
     }, 500);
   };
   const nameMouseUp = () => clearTimeout(lpTimer.current);
@@ -365,7 +403,8 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMove
     <div style={{ background: area.color+"bb", borderRadius:10, padding:8, border:`1px solid ${area.color}99` }}>
       <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:6 }}>
         <span onClick={nameClick}
-          onTouchStart={nameTouchStart} onTouchEnd={nameTouchEnd} onTouchMove={nameTouchEnd}
+          onTouchStart={(e) => { nameTouchStart(e); }}
+          onTouchEnd={nameTouchEnd} onTouchMove={nameTouchEnd}
           onMouseDown={nameMouseDown} onMouseUp={nameMouseUp} onMouseLeave={nameMouseUp}
           style={{ flex:1, fontWeight:"bold", fontSize:12, color:"#fff", cursor:"pointer", userSelect:"none" }}>
           {area.name}
@@ -384,7 +423,14 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMove
           style={{ background:"rgba(255,255,255,0.25)", border:"none", borderRadius:4, color:"#fff",
             cursor:"pointer", width:18, height:18, fontSize:13, display:"flex",
             alignItems:"center", justifyContent:"center" }}>🏡</button>
-        <MoveButtons onUp={onMoveUp} onDown={onMoveDown} canUp={canUp} canDown={canDown} />
+        {moveMenu && (
+          <MoveMenu x={moveMenu.x} y={moveMenu.y}
+            canUp={canUp} canDown={canDown}
+            onUp={onMoveUp} onDown={onMoveDown}
+            onEdit={() => setEditOpen(true)}
+            onDelete={onDelete}
+            onClose={() => setMoveMenu(null)} />
+        )}
       </div>
 
       {area.groups.map((g, gi) => (
