@@ -281,7 +281,7 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
   const [moveMenu, setMoveMenu] = useState(null);
 
   const lp = useLongPress((e) => {
-    setMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
+    setMoveMenu({ x: e?.clientX || 100, y: e?.clientY || 100 });
   });
 
   const updTask = (updated) => {
@@ -326,6 +326,8 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
             <MoveMenu x={moveMenu.x} y={moveMenu.y}
               canUp={canUp} canDown={canDown}
               onUp={onMoveUp} onDown={onMoveDown}
+              onEdit={() => setEditOpen(true)}
+              onDelete={onDelete}
               onClose={() => setMoveMenu(null)} />
           )}
         </div>
@@ -341,13 +343,6 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
         />
       ))}
 
-      {menu && (
-        <ContextMenu x={menu.x} y={menu.y}
-          onEdit={() => setEditOpen(true)}
-          onDelete={onDelete}
-          onClose={() => setMenu(null)}
-        />
-      )}
       {editOpen && (
         <EditModal title="圃場を編集" initName={group.name}
           showEmoji={false} showColor={false}
