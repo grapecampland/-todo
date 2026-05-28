@@ -275,7 +275,7 @@ function Task({ task, onChange, onDelete, onMoveUp, onMoveDown, canUp, canDown }
 }
 
 // グループ
-function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, canUp, canDown }) {
+function Group({ group, onChange, onAddTask, onDelete, onDeleteTask, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [moveMenu, setMoveMenu] = useState(null);
@@ -288,6 +288,7 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
     onChange({ ...group, tasks: sortByPri(group.tasks.map(t => t.id===updated.id ? updated : t)) });
   };
   const delTask = (task) => {
+    onDeleteTask(task);
     onChange({ ...group, tasks: group.tasks.filter(t => t.id!==task.id) });
   };
   const moveTask = (idx, dir) => {
@@ -355,7 +356,7 @@ function Group({ group, onChange, onAddTask, onDelete, onMoveUp, onMoveDown, can
 }
 
 // 地区カード
-function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMoveUp, onMoveDown, canUp, canDown }) {
+function AreaCard({ area, setAreas, onDelete, onAddTask, onDeleteTask, onMoveUp, onMoveDown, canUp, canDown }) {
   const [menu, setMenu] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [moveMenu, setMoveMenu] = useState(null);
@@ -435,6 +436,7 @@ function AreaCard({ area, setAreas, onDelete, onAddTask, onAreaDragStart, onMove
           }))}
           onAddTask={() => onAddTask(area.id, g.id)}
           onDelete={() => delGroup(g.id)}
+          onDeleteTask={(task) => onDeleteTask(g.id, task)}
           onMoveUp={() => moveGroup(gi, -1)}
           onMoveDown={() => moveGroup(gi, 1)}
           canUp={gi > 0}
@@ -566,6 +568,27 @@ function App() {
   useEffect(() => { save("todayGoal", todayGoal); }, [todayGoal]);
   useEffect(() => { save("logs", logs); }, [logs]);
 
+  const addLog = (areaName, taskText) => {
+    const now = new Date();
+    setLogs(prev => [{
+      id: nid(),
+      date: now.toLocaleDateString("ja-JP"),
+      time: now.toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit" }),
+      text: `✅ ${areaName} › ${taskText}`,
+      manual: false,
+    }, ...prev]);
+  };
+
+  const deleteTask = (areaId, groupId, task) => {
+    const area = areas.find(a => a.id === areaId);
+    if (area) addLog(area.name, task.text);
+    setAreasWithHistory(prev => prev.map(a => a.id !== areaId ? a : {
+      ...a, groups: a.groups.map(g => g.id !== groupId ? g : {
+        ...g, tasks: g.tasks.filter(t => t.id !== task.id)
+      })
+    }));
+  };
+
   const total = areas.reduce((s,a) => s + a.groups.reduce((gs,g) => gs + g.tasks.filter(t=>!t.done).length, 0), 0);
 
   return (
@@ -676,6 +699,7 @@ function App() {
             <div key={area.id} style={{ marginBottom: i < areas.length-1 ? 6 : 0, width:"100%" }}>
               <AreaCard area={area} setAreas={setAreasWithHistory} onDelete={() => del(area.id)}
                 onAddTask={addTask}
+                onDeleteTask={(groupId, task) => deleteTask(area.id, groupId, task)}
                 onMoveUp={() => moveArea(i, -1)}
                 onMoveDown={() => moveArea(i, 1)}
                 canUp={i > 0}
